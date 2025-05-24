@@ -142,23 +142,25 @@ class VideoCardV extends StatelessWidget {
             ),
           ),
         ),
-        if (videoItem.goto == 'av')
-          Positioned(
-            right: -5,
-            bottom: -2,
-            child: VideoPopupMenu(
-              size: 29,
-              iconSize: 17,
-              videoItem: videoItem,
-              onRemove: onRemove,
-            ),
-          ),
+        // if (videoItem.goto == 'av')
+        //   Positioned(
+        //     right: -5,
+        //     bottom: -2,
+        //     child: VideoPopupMenu(
+        //       size: 29,
+        //       iconSize: 17,
+        //       videoItem: videoItem,
+        //       onRemove: onRemove,
+        //     ),
+        //   ),
       ],
     );
   }
 
   Widget videoContent(context) {
     final theme = Theme.of(context);
+    String pubdate =videoItem.pubdate!=null?  Utils.dateFormat(videoItem.pubdate!, formatType: 'day'):"";
+    if (pubdate != '') pubdate += ' ';
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(6, 5, 6, 5),
@@ -222,7 +224,8 @@ class VideoCardV extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (videoItem.goto == 'av') const SizedBox(width: 10)
+                if (videoItem.goto == 'av') const SizedBox(width: 10),
+                Text(pubdate)
               ],
             ),
           ],
