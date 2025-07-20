@@ -130,8 +130,8 @@ class VideoCardV extends StatelessWidget {
 
   Widget content(BuildContext context) {
     final theme = Theme.of(context);
-    String pubdate =videoItem.pubdate!=null?  Utils.dateFormat(videoItem.pubdate!, formatType: 'day'):"";
-    if (pubdate != '') pubdate += ' ';
+    String pubdate = DateUtil.dateFormat(videoItem.pubdate ?? 0);
+    if (pubdate != '') pubdate += '  ';
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(6, 5, 6, 5),
