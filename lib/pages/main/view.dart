@@ -12,7 +12,6 @@ import 'package:PiliPlus/pages/home/view.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
-import 'package:PiliPlus/utils/event_bus.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/storage.dart';
@@ -35,30 +34,16 @@ class MainApp extends StatefulWidget {
 }
 
 class _MainAppState extends State<MainApp>
-    with SingleTickerProviderStateMixin, RouteAware, WidgetsBindingObserver {
+    with RouteAware, WidgetsBindingObserver {
   final MainController _mainController = Get.put(MainController());
   late final _homeController = Get.put(HomeController());
   late final _dynamicController = Get.put(DynamicsController());
 
   late int _lastSelectTime = 0;
-  late bool enableMYBar;
-  late bool useSideBar;
 
   @override
   void initState() {
     super.initState();
-    _lastSelectTime = DateTime.now().millisecondsSinceEpoch;
-    _mainController.controller = _mainController.mainTabBarView
-        ? TabController(
-            vsync: this,
-            initialIndex: _mainController.selectedIndex.value,
-            length: _mainController.navigationBars.length,
-          )
-        : PageController(initialPage: _mainController.selectedIndex.value);
-    enableMYBar =
-        GStorage.setting.get(SettingBoxKey.enableMYBar, defaultValue: true);
-    useSideBar =
-        GStorage.setting.get(SettingBoxKey.useSideBar, defaultValue: false);
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -109,7 +94,7 @@ class _MainAppState extends State<MainApp>
   }
 
   void _checkUnread([bool shouldCheck = false]) {
-    if (_mainController.isLogin.value &&
+    if (_mainController.accountService.isLogin.value &&
         _mainController.homeIndex != -1 &&
         _mainController.msgBadgeMode != DynamicBadgeMode.hidden) {
       if (shouldCheck &&
@@ -170,9 +155,16 @@ class _MainAppState extends State<MainApp>
     MainApp.routeObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
     GStorage.close();
-    EventBus().off(EventName.loginEvent);
     PiliScheme.listener?.cancel();
     super.dispose();
+  }
+
+  void onBack() {
+    if (Platform.isAndroid) {
+      Utils.channel.invokeMethod('back');
+    } else {
+      SystemNavigator.pop();
+    }
   }
 
   @override
@@ -182,15 +174,15 @@ class _MainAppState extends State<MainApp>
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (_mainController.selectedIndex.value != 0) {
-          setIndex(0);
-          _mainController.bottomBarStream?.add(true);
-          _homeController.searchBarStream?.add(true);
+        if (_mainController.directExitOnBack) {
+          onBack();
         } else {
-          if (Platform.isAndroid) {
-            Utils.channel.invokeMethod('back');
+          if (_mainController.selectedIndex.value != 0) {
+            setIndex(0);
+            _mainController.bottomBarStream?.add(true);
+            _homeController.searchBarStream?.add(true);
           } else {
-            SystemNavigator.pop();
+            onBack();
           }
         }
       },
@@ -200,30 +192,27 @@ class _MainAppState extends State<MainApp>
           systemNavigationBarIconBrightness: theme.brightness.reverse,
         ),
         child: Scaffold(
-          resizeToAvoidBottomInset: false,
           extendBody: true,
-          body: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (useSideBar || !isPortrait) ...[
-                Obx(
-                  () => _mainController.navigationBars.length > 1
-                      ? context.isTablet && GStorage.optTabletNav
+          appBar: AppBar(toolbarHeight: 0),
+          body: SafeArea(
+            bottom: false,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_mainController.useSideBar || !isPortrait) ...[
+                  _mainController.navigationBars.length > 1
+                      ? context.isTablet && _mainController.optTabletNav
                           ? Column(
                               children: [
-                                SizedBox(
-                                    height:
-                                        MediaQuery.paddingOf(context).top + 50),
+                                const SizedBox(height: 25),
                                 userAndSearchVertical(theme),
                                 const Spacer(flex: 2),
                                 Expanded(
                                   flex: 5,
                                   child: SizedBox(
                                     width: 130,
-                                    child: MediaQuery.removePadding(
-                                      context: context,
-                                      removeRight: true,
-                                      child: NavigationDrawer(
+                                    child: Obx(
+                                      () => NavigationDrawer(
                                         backgroundColor: Colors.transparent,
                                         tilePadding: const EdgeInsets.symmetric(
                                             vertical: 5, horizontal: 12),
@@ -236,88 +225,56 @@ class _MainAppState extends State<MainApp>
                                         onDestinationSelected: setIndex,
                                         selectedIndex:
                                             _mainController.selectedIndex.value,
-                                        children: [
-                                          ..._mainController.navigationBars
-                                              .map((e) {
-                                            return NavigationDrawerDestination(
-                                              label: Text(e.label),
-                                              icon: _buildIcon(
-                                                type: e,
-                                                count: e ==
-                                                        NavigationBarType
-                                                            .dynamics
-                                                    ? _mainController.dynCount
-                                                    : 0,
-                                              ),
-                                              selectedIcon: _buildIcon(
-                                                type: e,
-                                                count: e ==
-                                                        NavigationBarType
-                                                            .dynamics
-                                                    ? _mainController.dynCount
-                                                    : 0,
-                                                selected: true,
-                                              ),
-                                            );
-                                          }),
-                                        ],
+                                        children: _mainController.navigationBars
+                                            .map(
+                                              (e) =>
+                                                  NavigationDrawerDestination(
+                                                      label: Text(e.label),
+                                                      icon: _buildIcon(type: e),
+                                                      selectedIcon: _buildIcon(
+                                                        type: e,
+                                                        selected: true,
+                                                      )),
+                                            )
+                                            .toList(),
                                       ),
                                     ),
                                   ),
                                 ),
                               ],
                             )
-                          : NavigationRail(
-                              groupAlignment: 0.5,
-                              selectedIndex:
-                                  _mainController.selectedIndex.value,
-                              onDestinationSelected: setIndex,
-                              labelType: NavigationRailLabelType.selected,
-                              leading: userAndSearchVertical(theme),
-                              destinations: _mainController.navigationBars
-                                  .map(
-                                    (e) => NavigationRailDestination(
-                                      label: Text(e.label),
-                                      icon: _buildIcon(
-                                        type: e,
-                                        count: e == NavigationBarType.dynamics
-                                            ? _mainController.dynCount
-                                            : 0,
-                                      ),
-                                      selectedIcon: _buildIcon(
-                                        type: e,
-                                        count: e == NavigationBarType.dynamics
-                                            ? _mainController.dynCount
-                                            : 0,
-                                        selected: true,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
+                          : Obx(
+                              () => NavigationRail(
+                                groupAlignment: 0.5,
+                                selectedIndex:
+                                    _mainController.selectedIndex.value,
+                                onDestinationSelected: setIndex,
+                                labelType: NavigationRailLabelType.selected,
+                                leading: userAndSearchVertical(theme),
+                                destinations: _mainController.navigationBars
+                                    .map((e) => NavigationRailDestination(
+                                          label: Text(e.label),
+                                          icon: _buildIcon(type: e),
+                                          selectedIcon: _buildIcon(
+                                            type: e,
+                                            selected: true,
+                                          ),
+                                        ))
+                                    .toList(),
+                              ),
                             )
-                      : SafeArea(
-                          right: false,
-                          child: Container(
-                            padding: const EdgeInsets.only(
-                              top: 10,
-                            ),
-                            width: 80,
-                            child: userAndSearchVertical(theme),
-                          ),
+                      : Container(
+                          padding: const EdgeInsets.only(top: 10),
+                          width: 80,
+                          child: userAndSearchVertical(theme),
                         ),
-                ),
-                VerticalDivider(
-                  width: 1,
-                  indent: MediaQuery.of(context).padding.top,
-                  endIndent: MediaQuery.of(context).padding.bottom,
-                  color: theme.colorScheme.outline.withValues(alpha: 0.06),
-                ),
-              ],
-              Expanded(
-                child: SafeArea(
-                  top: false,
-                  bottom: false,
-                  left: isPortrait,
+                  VerticalDivider(
+                    width: 1,
+                    endIndent: MediaQuery.paddingOf(context).bottom,
+                    color: theme.colorScheme.outline.withValues(alpha: 0.06),
+                  ),
+                ],
+                Expanded(
                   child: _mainController.mainTabBarView
                       ? CustomTabBarView(
                           scrollDirection:
@@ -336,10 +293,10 @@ class _MainAppState extends State<MainApp>
                               .toList(),
                         ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          bottomNavigationBar: useSideBar || !isPortrait
+          bottomNavigationBar: _mainController.useSideBar || !isPortrait
               ? null
               : StreamBuilder(
                   stream: _mainController.hideTabBar
@@ -355,76 +312,47 @@ class _MainAppState extends State<MainApp>
                       curve: Curves.easeInOutCubicEmphasized,
                       duration: const Duration(milliseconds: 500),
                       offset: Offset(0, snapshot.data ? 0 : 1),
-                      child: enableMYBar
-                          ? Obx(
-                              () => _mainController.navigationBars.length > 1
-                                  ? NavigationBar(
-                                      onDestinationSelected: setIndex,
-                                      selectedIndex:
-                                          _mainController.selectedIndex.value,
-                                      destinations:
-                                          _mainController.navigationBars.map(
-                                        (e) {
-                                          return NavigationDestination(
+                      child: _mainController.enableMYBar
+                          ? _mainController.navigationBars.length > 1
+                              ? Obx(
+                                  () => NavigationBar(
+                                    onDestinationSelected: setIndex,
+                                    selectedIndex:
+                                        _mainController.selectedIndex.value,
+                                    destinations: _mainController.navigationBars
+                                        .map((e) => NavigationDestination(
                                             label: e.label,
-                                            icon: _buildIcon(
-                                              type: e,
-                                              count: e ==
-                                                      NavigationBarType.dynamics
-                                                  ? _mainController.dynCount
-                                                  : 0,
-                                            ),
+                                            icon: _buildIcon(type: e),
                                             selectedIcon: _buildIcon(
                                               type: e,
-                                              count: e ==
-                                                      NavigationBarType.dynamics
-                                                  ? _mainController.dynCount
-                                                  : 0,
                                               selected: true,
-                                            ),
-                                          );
-                                        },
-                                      ).toList(),
-                                    )
-                                  : const SizedBox.shrink(),
-                            )
-                          : Obx(
-                              () => _mainController.navigationBars.length > 1
-                                  ? BottomNavigationBar(
-                                      currentIndex:
-                                          _mainController.selectedIndex.value,
-                                      onTap: setIndex,
-                                      iconSize: 16,
-                                      selectedFontSize: 12,
-                                      unselectedFontSize: 12,
-                                      type: BottomNavigationBarType.fixed,
-                                      items: _mainController.navigationBars
-                                          .map(
-                                            (e) => BottomNavigationBarItem(
-                                              label: e.label,
-                                              icon: _buildIcon(
-                                                type: e,
-                                                count: e ==
-                                                        NavigationBarType
-                                                            .dynamics
-                                                    ? _mainController.dynCount
-                                                    : 0,
-                                              ),
-                                              activeIcon: _buildIcon(
-                                                type: e,
-                                                count: e ==
-                                                        NavigationBarType
-                                                            .dynamics
-                                                    ? _mainController.dynCount
-                                                    : 0,
-                                                selected: true,
-                                              ),
-                                            ),
-                                          )
-                                          .toList(),
-                                    )
-                                  : const SizedBox.shrink(),
-                            ),
+                                            )))
+                                        .toList(),
+                                  ),
+                                )
+                              : const SizedBox.shrink()
+                          : _mainController.navigationBars.length > 1
+                              ? Obx(
+                                  () => BottomNavigationBar(
+                                    currentIndex:
+                                        _mainController.selectedIndex.value,
+                                    onTap: setIndex,
+                                    iconSize: 16,
+                                    selectedFontSize: 12,
+                                    unselectedFontSize: 12,
+                                    type: BottomNavigationBarType.fixed,
+                                    items: _mainController.navigationBars
+                                        .map((e) => BottomNavigationBarItem(
+                                            label: e.label,
+                                            icon: _buildIcon(type: e),
+                                            activeIcon: _buildIcon(
+                                              type: e,
+                                              selected: true,
+                                            )))
+                                        .toList(),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
                     );
                   },
                 ),
@@ -435,17 +363,19 @@ class _MainAppState extends State<MainApp>
 
   Widget _buildIcon({
     required NavigationBarType type,
-    required int count,
     bool selected = false,
   }) {
     final icon = selected ? type.selectIcon : type.icon;
-    return count > 0
-        ? Badge(
-            label: _mainController.dynamicBadgeMode == DynamicBadgeMode.number
-                ? Text(count.toString())
-                : null,
-            padding: const EdgeInsets.fromLTRB(6, 0, 6, 0),
-            child: icon,
+    return type == NavigationBarType.dynamics
+        ? Obx(
+            () => Badge(
+              isLabelVisible: _mainController.dynCount.value > 0,
+              label: _mainController.dynamicBadgeMode == DynamicBadgeMode.number
+                  ? Text(_mainController.dynCount.value.toString())
+                  : null,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: icon,
+            ),
           )
         : icon;
   }
@@ -456,7 +386,7 @@ class _MainAppState extends State<MainApp>
         Semantics(
           label: "我的",
           child: Obx(
-            () => _homeController.isLogin.value
+            () => _mainController.accountService.isLogin.value
                 ? Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -464,19 +394,17 @@ class _MainAppState extends State<MainApp>
                         type: ImageType.avatar,
                         width: 34,
                         height: 34,
-                        src: _homeController.userFace.value,
+                        src: _mainController.accountService.face.value,
                       ),
                       Positioned.fill(
                         child: Material(
-                          color: Colors.transparent,
+                          type: MaterialType.transparency,
                           child: InkWell(
                             onTap: () =>
                                 _homeController.showUserInfoDialog(context),
                             splashColor: theme.colorScheme.primaryContainer
                                 .withValues(alpha: 0.3),
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(50),
-                            ),
+                            customBorder: const CircleBorder(),
                           ),
                         ),
                       ),
@@ -512,7 +440,7 @@ class _MainAppState extends State<MainApp>
         ),
         const SizedBox(height: 8),
         Obx(
-          () => _homeController.isLogin.value
+          () => _mainController.accountService.isLogin.value
               ? msgBadge(_mainController)
               : const SizedBox.shrink(),
         ),

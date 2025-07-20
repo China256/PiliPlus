@@ -7,7 +7,6 @@ import 'package:PiliPlus/pages/search_panel/pgc/view.dart';
 import 'package:PiliPlus/pages/search_panel/user/view.dart';
 import 'package:PiliPlus/pages/search_panel/video/view.dart';
 import 'package:PiliPlus/pages/search_result/controller.dart';
-import 'package:PiliPlus/utils/extension.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -137,7 +136,7 @@ class _SearchResultPageState extends State<SearchResultPage>
                 unselectedLabelColor: theme.colorScheme.outline,
                 tabAlignment: TabAlignment.start,
                 onTap: (index) {
-                  if (_tabController.indexIsChanging.not) {
+                  if (!_tabController.indexIsChanging) {
                     if (_searchResultController.toTopIndex.value == index) {
                       _searchResultController.toTopIndex.refresh();
                     } else {
@@ -148,49 +147,46 @@ class _SearchResultPageState extends State<SearchResultPage>
               ),
             ),
             Expanded(
-              child: Material(
-                color: Colors.transparent,
-                child: tabBarView(
-                  controller: _tabController,
-                  children: SearchType.values
-                      .map(
-                        (item) => switch (item) {
-                          // SearchType.all => SearchAllPanel(
-                          //     tag: _tag,
-                          //     searchType: item,
-                          //     keyword: _searchResultController.keyword,
-                          //   ),
-                          SearchType.video => SearchVideoPanel(
-                              tag: _tag,
-                              searchType: item,
-                              keyword: _searchResultController.keyword,
-                            ),
-                          SearchType.media_bangumi ||
-                          SearchType.media_ft =>
-                            SearchPgcPanel(
-                              tag: _tag,
-                              searchType: item,
-                              keyword: _searchResultController.keyword,
-                            ),
-                          SearchType.live_room => SearchLivePanel(
-                              tag: _tag,
-                              searchType: item,
-                              keyword: _searchResultController.keyword,
-                            ),
-                          SearchType.bili_user => SearchUserPanel(
-                              tag: _tag,
-                              searchType: item,
-                              keyword: _searchResultController.keyword,
-                            ),
-                          SearchType.article => SearchArticlePanel(
-                              tag: _tag,
-                              searchType: item,
-                              keyword: _searchResultController.keyword,
-                            ),
-                        },
-                      )
-                      .toList(),
-                ),
+              child: tabBarView(
+                controller: _tabController,
+                children: SearchType.values
+                    .map(
+                      (item) => switch (item) {
+                        // SearchType.all => SearchAllPanel(
+                        //     tag: _tag,
+                        //     searchType: item,
+                        //     keyword: _searchResultController.keyword,
+                        //   ),
+                        SearchType.video => SearchVideoPanel(
+                            tag: _tag,
+                            searchType: item,
+                            keyword: _searchResultController.keyword,
+                          ),
+                        SearchType.media_bangumi ||
+                        SearchType.media_ft =>
+                          SearchPgcPanel(
+                            tag: _tag,
+                            searchType: item,
+                            keyword: _searchResultController.keyword,
+                          ),
+                        SearchType.live_room => SearchLivePanel(
+                            tag: _tag,
+                            searchType: item,
+                            keyword: _searchResultController.keyword,
+                          ),
+                        SearchType.bili_user => SearchUserPanel(
+                            tag: _tag,
+                            searchType: item,
+                            keyword: _searchResultController.keyword,
+                          ),
+                        SearchType.article => SearchArticlePanel(
+                            tag: _tag,
+                            searchType: item,
+                            keyword: _searchResultController.keyword,
+                          ),
+                      },
+                    )
+                    .toList(),
               ),
             ),
           ],

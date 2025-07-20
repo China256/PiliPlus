@@ -1,28 +1,35 @@
+import 'package:PiliPlus/common/widgets/pair.dart';
 import 'package:PiliPlus/http/api.dart';
 import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamics_type.dart';
-import 'package:PiliPlus/models/dynamics/article_list/data.dart';
-import 'package:PiliPlus/models/dynamics/dyn_topic_feed/topic_card_list.dart';
-import 'package:PiliPlus/models/dynamics/dyn_topic_top/top_details.dart';
+import 'package:PiliPlus/models/common/reply/reply_option_type.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
 import 'package:PiliPlus/models/dynamics/up.dart';
 import 'package:PiliPlus/models/dynamics/vote_model.dart';
-import 'package:PiliPlus/models/space_article/item.dart';
+import 'package:PiliPlus/models_new/article/article_info/data.dart';
+import 'package:PiliPlus/models_new/article/article_list/data.dart';
+import 'package:PiliPlus/models_new/article/article_view/data.dart';
+import 'package:PiliPlus/models_new/dynamic/dyn_mention/data.dart';
+import 'package:PiliPlus/models_new/dynamic/dyn_mention/group.dart';
+import 'package:PiliPlus/models_new/dynamic/dyn_reserve/data.dart';
+import 'package:PiliPlus/models_new/dynamic/dyn_reserve_info/data.dart';
+import 'package:PiliPlus/models_new/dynamic/dyn_topic_feed/topic_card_list.dart';
+import 'package:PiliPlus/models_new/dynamic/dyn_topic_top/top_details.dart';
+import 'package:PiliPlus/models_new/dynamic/dyn_topic_top/topic_item.dart';
+import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/accounts/account.dart';
-import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/utils/utils.dart';
 import 'package:PiliPlus/utils/wbi_sign.dart';
 import 'package:dio/dio.dart';
 
 class DynamicsHttp {
-  static RegExp banWordForDyn =
-      RegExp(GStorage.banWordForDyn, caseSensitive: false);
-
   static Future<LoadingState<DynamicsDataModel>> followDynamic({
     DynamicsTabType type = DynamicsTabType.all,
     String? offset,
     int? mid,
+    Set<int>? tempBannedList,
   }) async {
     Map<String, dynamic> data = {
       if (type == DynamicsTabType.up)
@@ -35,39 +42,20 @@ class DynamicsHttp {
       'features': 'itemOpusStyle,listOnlyfans',
     };
     var res = await Request().get(Api.followDynamic, queryParameters: data);
-    if (res.data['code'] == 0) {
+    var code = res.data['code'];
+    if (code == 0) {
       try {
-        DynamicsDataModel data = DynamicsDataModel.fromJson(res.data['data']);
-        final antiGoodsDyn = GStorage.antiGoodsDyn;
-        final filterWord = banWordForDyn.pattern.isNotEmpty;
-
-        data.items?.removeWhere(
-          (item) =>
-              (antiGoodsDyn &&
-                  (item.orig?.modules.moduleDynamic?.additional?.type ==
-                          'ADDITIONAL_TYPE_GOODS' ||
-                      item.modules.moduleDynamic?.additional?.type ==
-                          'ADDITIONAL_TYPE_GOODS')) ||
-              (filterWord &&
-                  (item.orig?.modules.moduleDynamic?.major?.opus?.summary?.text
-                              ?.contains(banWordForDyn) ==
-                          true ||
-                      item.modules.moduleDynamic?.major?.opus?.summary?.text
-                              ?.contains(banWordForDyn) ==
-                          true ||
-                      item.orig?.modules.moduleDynamic?.desc?.text
-                              ?.contains(banWordForDyn) ==
-                          true ||
-                      item.modules.moduleDynamic?.desc?.text
-                              ?.contains(banWordForDyn) ==
-                          true)),
+        DynamicsDataModel data = DynamicsDataModel.fromJson(
+          res.data['data'],
+          type: type,
+          tempBannedList: tempBannedList,
         );
         return Success(data);
       } catch (err) {
         return Error(err.toString());
       }
     } else {
-      return Error(res.data['message']);
+      return Error(code == 4101132 ? '没有数据' : res.data['message']);
     }
   }
 
@@ -131,6 +119,98 @@ class DynamicsHttp {
     }
   }
 
+  static Future createDynamic({
+    dynamic mid,
+    dynamic dynIdStr, // repost dyn
+    dynamic rid, // repost video
+    dynamic dynType,
+    dynamic rawText,
+    List? pics,
+    int? publishTime,
+    ReplyOptionType? replyOption,
+    int? privatePub,
+    List<Map<String, dynamic>>? extraContent,
+    Pair<int, String>? topic,
+    String? title,
+    Map? attachCard,
+  }) async {
+    var res = await Request().post(
+      Api.createDynamic,
+      queryParameters: {
+        'platform': 'web',
+        'csrf': Accounts.main.csrf,
+        'x-bili-device-req-json': {"platform": "web", "device": "pc"},
+        'x-bili-web-req-json': {"spm_id": "333.999"},
+      },
+      data: {
+        "dyn_req": {
+          "content": {
+            "contents": [
+              if (rawText != null)
+                {
+                  "raw_text": rawText,
+                  "type": 1,
+                  "biz_id": "",
+                },
+              ...?extraContent,
+            ],
+            if (title?.isNotEmpty == true) 'title': title,
+          },
+          if (privatePub != null || replyOption != null || publishTime != null)
+            "option": {
+              if (privatePub != null) 'private_pub': privatePub,
+              if (publishTime != null) "timer_pub_time": publishTime,
+              if (replyOption == ReplyOptionType.close)
+                "close_comment": 1
+              else if (replyOption == ReplyOptionType.choose)
+                "up_choose_comment": 1,
+            },
+          "scene": rid != null
+              ? 5
+              : dynIdStr != null
+                  ? 4
+                  : pics != null
+                      ? 2
+                      : 1,
+          if (pics != null) 'pics': pics,
+          "attach_card": attachCard,
+          "upload_id":
+              "${rid != null ? 0 : mid}_${DateTime.now().millisecondsSinceEpoch ~/ 1000}_${Utils.random.nextInt(9000) + 1000}",
+          "meta": {
+            "app_meta": {"from": "create.dynamic.web", "mobi_app": "web"}
+          },
+          if (topic != null)
+            "topic": {
+              "id": topic.first,
+              "name": topic.second,
+              "from_source": "dyn.web.list",
+              "from_topic_id": 0,
+            }
+        },
+        if (dynIdStr != null || rid != null)
+          "web_repost_src": {
+            if (dynIdStr != null) "dyn_id_str": dynIdStr,
+            if (rid != null)
+              "revs_id": {
+                "dyn_type": dynType,
+                "rid": rid,
+              }
+          }
+      },
+    );
+    if (res.data['code'] == 0) {
+      return {
+        'status': true,
+        'data': res.data['data'],
+      };
+    } else {
+      return {
+        'status': false,
+        'msg': res.data['message'],
+      };
+    }
+  }
+
   //
   static Future dynamicDetail({
     dynamic id,
@@ -150,10 +230,11 @@ class DynamicsHttp {
         'web_location': '333.1330',
         'x-bili-device-req-json':
             '{"platform":"web","device":"pc","spmid":"333.1330"}',
-        if (Accounts.main.isLogin) 'csrf': Accounts.main.csrf,
+        if (!clearCookie && Accounts.main.isLogin) 'csrf': Accounts.main.csrf,
       },
-      options:
-          clearCookie ? Options(extra: {'account': AnonymousAccount()}) : null,
+      options: clearCookie
+          ? Options(extra: {'account': AnonymousAccount(), 'checkReply': true})
+          : null,
     );
     if (res.data['code'] == 0) {
       try {
@@ -194,6 +275,25 @@ class DynamicsHttp {
     }
   }
 
+  static Future rmTop({
+    required dynamic dynamicId,
+  }) async {
+    var res = await Request().post(
+      Api.rmTopDyn,
+      queryParameters: {
+        'csrf': Accounts.main.csrf,
+      },
+      data: {
+        'dyn_str': dynamicId,
+      },
+    );
+    if (res.data['code'] == 0) {
+      return {'status': true};
+    } else {
+      return {'status': false, 'msg': res.data['message']};
+    }
+  }
+
   static Future articleInfo({
     required dynamic cvId,
   }) async {
@@ -207,13 +307,16 @@ class DynamicsHttp {
       }),
     );
     if (res.data['code'] == 0) {
-      return {'status': true, 'data': res.data['data']};
+      return {
+        'status': true,
+        'data': ArticleInfoData.fromJson(res.data['data'])
+      };
     } else {
       return {'status': false, 'msg': res.data['message']};
     }
   }
 
-  static Future<LoadingState<SpaceArticleItem>> articleView(
+  static Future<LoadingState<ArticleViewData>> articleView(
       {required dynamic cvId}) async {
     final res = await Request().get(
       Api.articleView,
@@ -224,7 +327,7 @@ class DynamicsHttp {
       }),
     );
     if (res.data['code'] == 0) {
-      return Success(SpaceArticleItem.fromJson(res.data['data']));
+      return Success(ArticleViewData.fromJson(res.data['data']));
     } else {
       return Error(res.data['message']);
     }
@@ -366,9 +469,160 @@ class DynamicsHttp {
       },
     );
     if (res.data['code'] == 0) {
-      return {'status': true, 'data': res.data['data']};
+      return {
+        'status': true,
+        'data': DynReserveData.fromJson(res.data['data'])
+      };
     } else {
       return {'status': false, 'msg': res.data['message']};
+    }
+  }
+
+  static Future<LoadingState<List<TopicItem>?>> dynTopicRcmd(
+      {int ps = 25}) async {
+    final res = await Request().get(
+      Api.dynTopicRcmd,
+      queryParameters: {
+        'source': 'Web',
+        'page_size': ps,
+        'web_location': 333.1365,
+      },
+    );
+    if (res.data['code'] == 0) {
+      return Success((res.data['data']?['topic_items'] as List?)
+          ?.map((e) => TopicItem.fromJson(e))
+          .toList());
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<List<OpusPicModel>?>> dynPic(dynamic id) async {
+    final res = await Request().get(
+      Api.dynPic,
+      queryParameters: {
+        'id': id,
+        'web_location': 333.1368,
+      },
+    );
+    if (res.data['code'] == 0) {
+      return Success((res.data['data'] as List?)
+          ?.map((e) => OpusPicModel.fromJson(e))
+          .toList());
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<List<MentionGroup>?>> dynMention(
+      {String? keyword}) async {
+    final res = await Request().get(
+      Api.dynMention,
+      queryParameters: {
+        if (keyword?.isNotEmpty == true) 'keyword': keyword,
+        'web_location': 333.1365,
+      },
+    );
+    if (res.data['code'] == 0) {
+      return Success(
+        DynMentionData.fromJson(res.data['data']).groups,
+      );
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<int?>> createVote(VoteInfo voteInfo) async {
+    final res = await Request().post(
+      Api.createVote,
+      queryParameters: {'csrf': Accounts.main.csrf},
+      data: {'vote_info': voteInfo.toJson()},
+    );
+    if (res.data['code'] == 0) {
+      return Success(res.data['data']?['vote_id']);
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<int?>> updateVote(VoteInfo voteInfo) async {
+    final res = await Request().post(
+      Api.updateVote,
+      queryParameters: {'csrf': Accounts.main.csrf},
+      data: {'vote_info': voteInfo.toJson()},
+    );
+    if (res.data['code'] == 0) {
+      return Success(res.data['data']?['vote_id']);
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<int?>> createReserve({
+    int subType = 0,
+    required String title,
+    required int livePlanStartTime,
+  }) async {
+    final res = await Request().post(
+      Api.createReserve,
+      data: {
+        'type': 2,
+        'sub_type': subType,
+        'from': 1,
+        'title': title,
+        'live_plan_start_time': livePlanStartTime,
+        'csrf': Accounts.main.csrf,
+      },
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+    if (res.data['code'] == 0) {
+      return Success(res.data['data']?['sid']);
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<int?>> updateReserve({
+    int subType = 0,
+    required String title,
+    required int livePlanStartTime,
+    required int sid,
+  }) async {
+    final res = await Request().post(
+      Api.updateReserve,
+      data: {
+        'type': 2,
+        'sub_type': subType,
+        'from': 1,
+        'title': title,
+        'live_plan_start_time': livePlanStartTime,
+        'id': sid,
+        'csrf': Accounts.main.csrf,
+      },
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+    if (res.data['code'] == 0) {
+      return Success(res.data['data']?['sid']);
+    } else {
+      return Error(res.data['message']);
+    }
+  }
+
+  static Future<LoadingState<ReserveInfoData>> reserveInfo({
+    required dynamic sid,
+  }) async {
+    final res = await Request().get(
+      Api.reserveInfo,
+      queryParameters: {
+        'from': 1,
+        'id': sid,
+        'web_location': 333.1365,
+      },
+    );
+    if (res.data['code'] == 0) {
+      return Success(ReserveInfoData.fromJson(res.data['data']));
+    } else {
+      return Error(res.data['message']);
     }
   }
 }

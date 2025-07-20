@@ -1,9 +1,9 @@
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
 import 'package:PiliPlus/pages/fan/view.dart';
-import 'package:PiliPlus/pages/follow/child_view.dart';
+import 'package:PiliPlus/pages/follow/child/child_view.dart';
 import 'package:PiliPlus/pages/follow_search/view.dart';
 import 'package:PiliPlus/pages/share/view.dart' show UserModel;
-import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/services/account_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -18,7 +18,7 @@ class ContactPage extends StatefulWidget {
 
 class _ContactPageState extends State<ContactPage>
     with SingleTickerProviderStateMixin {
-  final mid = Accounts.main.mid;
+  AccountService accountService = Get.find<AccountService>();
   late final _controller = TabController(length: 2, vsync: this);
 
   @override
@@ -46,13 +46,13 @@ class _ContactPageState extends State<ContactPage>
         actions: [
           IconButton(
             onPressed: () async {
-              UserModel? userModel = await Get.dialog(
-                FollowSearchPage(
-                  mid: mid,
-                  isFromSelect: widget.isFromSelect,
+              UserModel? userModel = await Navigator.of(context).push(
+                GetPageRoute(
+                  page: () => FollowSearchPage(
+                    mid: accountService.mid,
+                    isFromSelect: widget.isFromSelect,
+                  ),
                 ),
-                useSafeArea: false,
-                transitionDuration: const Duration(milliseconds: 120),
               );
               if (userModel != null) {
                 Get.back(result: userModel);
@@ -67,11 +67,11 @@ class _ContactPageState extends State<ContactPage>
         controller: _controller,
         children: [
           FollowChildPage(
-            mid: mid,
+            mid: accountService.mid,
             onSelect: widget.isFromSelect ? onSelect : null,
           ),
           FansPage(
-            mid: mid,
+            mid: accountService.mid,
             onSelect: widget.isFromSelect ? onSelect : null,
           ),
         ],

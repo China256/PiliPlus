@@ -1,9 +1,10 @@
 import 'dart:async';
 
-import 'package:PiliPlus/models/video_detail_res.dart';
+import 'package:PiliPlus/models_new/video/video_detail/data.dart';
+import 'package:PiliPlus/models_new/video/video_detail/episode.dart';
+import 'package:PiliPlus/models_new/video/video_detail/section.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/controller.dart';
-import 'package:PiliPlus/utils/extension.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -67,7 +68,7 @@ class _SeasonPanelState extends State<SeasonPanel> {
       if (_videoDetailController.seasonCid != cid) {
         bool isPart =
             videoDetail.pages?.indexWhere((item) => item.cid == cid) != -1;
-        if (isPart.not) {
+        if (!isPart) {
           _videoDetailController.seasonCid = cid;
         }
       }
@@ -89,68 +90,66 @@ class _SeasonPanelState extends State<SeasonPanel> {
       return const SizedBox.shrink();
     }
     final theme = Theme.of(context);
-    return Builder(builder: (BuildContext context) {
-      return Container(
-        margin: const EdgeInsets.only(
-          top: 8,
-          left: 2,
-          right: 2,
-        ),
-        child: Material(
-          color: theme.colorScheme.onInverseSurface,
+    return Padding(
+      padding: const EdgeInsets.only(
+        top: 8,
+        left: 2,
+        right: 2,
+      ),
+      child: Material(
+        color: theme.colorScheme.onInverseSurface,
+        borderRadius: const BorderRadius.all(Radius.circular(6)),
+        child: InkWell(
           borderRadius: const BorderRadius.all(Radius.circular(6)),
-          clipBehavior: Clip.hardEdge,
-          child: InkWell(
-            onTap: widget.onTap == false
-                ? null
-                : () => widget.showEpisodes(
-                      _videoDetailController.seasonIndex.value,
-                      videoDetail.ugcSeason,
-                      null,
-                      _videoDetailController.bvid,
-                      null,
-                      _videoDetailController.seasonCid,
-                    ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      '合集：${videoDetail.ugcSeason!.title!}',
-                      style: theme.textTheme.labelMedium,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+          onTap: widget.onTap == false
+              ? null
+              : () => widget.showEpisodes(
+                    _videoDetailController.seasonIndex.value,
+                    videoDetail.ugcSeason,
+                    null,
+                    _videoDetailController.bvid,
+                    null,
+                    _videoDetailController.seasonCid,
                   ),
-                  const SizedBox(width: 15),
-                  Image.asset(
-                    'assets/images/live.png',
-                    color: theme.colorScheme.primary,
-                    height: 12,
-                    semanticLabel: "正在播放：",
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    '合集：${videoDetail.ugcSeason!.title!}',
+                    style: theme.textTheme.labelMedium,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(width: 10),
-                  Obx(
-                    () => Text(
-                      '${currentIndex.value + 1}/${episodes.length}',
-                      style: theme.textTheme.labelMedium,
-                      semanticsLabel:
-                          '第${currentIndex.value + 1}集，共${episodes.length}集',
-                    ),
+                ),
+                const SizedBox(width: 15),
+                Image.asset(
+                  'assets/images/live.png',
+                  color: theme.colorScheme.primary,
+                  height: 12,
+                  semanticLabel: "正在播放：",
+                ),
+                const SizedBox(width: 10),
+                Obx(
+                  () => Text(
+                    '${currentIndex.value + 1}/${episodes.length}',
+                    style: theme.textTheme.labelMedium,
+                    semanticsLabel:
+                        '第${currentIndex.value + 1}集，共${episodes.length}集',
                   ),
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.arrow_forward_ios_outlined,
-                    size: 13,
-                    semanticLabel: '查看',
-                  )
-                ],
-              ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.arrow_forward_ios_outlined,
+                  size: 13,
+                  semanticLabel: '查看',
+                )
+              ],
             ),
           ),
         ),
-      );
-    });
+      ),
+    );
   }
 
   void _findEpisode() {

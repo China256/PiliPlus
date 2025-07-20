@@ -75,7 +75,6 @@ class _RcmdPageState extends CommonPageState<RcmdPage, RcmdController>
                           ..animateToTop()
                           ..onRefresh(),
                         child: Card(
-                          margin: EdgeInsets.zero,
                           child: Container(
                             alignment: Alignment.center,
                             padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -105,20 +104,18 @@ class _RcmdPageState extends CommonPageState<RcmdPage, RcmdController>
                           controller.lastRefreshAt =
                               controller.lastRefreshAt! - 1;
                         }
-                        ((controller.loadingState.value as Success).response
-                                as List)
-                            .removeAt(actualIndex);
-                        controller.loadingState.refresh();
+                        controller.loadingState
+                          ..value.data!.removeAt(actualIndex)
+                          ..refresh();
                       },
                     );
                   } else {
                     return VideoCardV(
                       videoItem: response[index],
                       onRemove: () {
-                        ((controller.loadingState.value as Success).response
-                                as List)
-                            .removeAt(index);
-                        controller.loadingState.refresh();
+                        controller.loadingState
+                          ..value.data!.removeAt(index)
+                          ..refresh();
                       },
                     );
                   }

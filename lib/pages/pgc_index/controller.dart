@@ -1,13 +1,18 @@
-import 'package:PiliPlus/http/bangumi.dart';
+import 'package:PiliPlus/http/pgc.dart';
 import 'package:PiliPlus/http/loading_state.dart';
-import 'package:PiliPlus/models/bangumi/pgc_index/condition.dart';
+import 'package:PiliPlus/models_new/pgc/pgc_index_condition/data.dart';
+import 'package:PiliPlus/models_new/pgc/pgc_index_condition/filter.dart';
+import 'package:PiliPlus/models_new/pgc/pgc_index_result/data.dart';
+import 'package:PiliPlus/models_new/pgc/pgc_index_result/list.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
 import 'package:get/get.dart';
 
-class PgcIndexController extends CommonListController {
+class PgcIndexController
+    extends CommonListController<PgcIndexResult, PgcIndexItem> {
   PgcIndexController(this.indexType);
   int? indexType;
-  Rx<LoadingState> conditionState = LoadingState.loading().obs;
+  Rx<LoadingState<PgcIndexConditionData>> conditionState =
+      LoadingState<PgcIndexConditionData>.loading().obs;
 
   late final RxBool isExpand = false.obs;
 
@@ -20,18 +25,18 @@ class PgcIndexController extends CommonListController {
   }
 
   Future<void> getPgcIndexCondition() async {
-    dynamic res = await BangumiHttp.pgcIndexCondition(
+    var res = await PgcHttp.pgcIndexCondition(
       seasonType: indexType == null ? 1 : null,
       type: 0,
       indexType: indexType,
     );
-    if (res is Success) {
-      PgcIndexCondition data = res.response;
+    if (res.isSuccess) {
+      PgcIndexConditionData data = res.data;
       if (data.order?.isNotEmpty == true) {
         indexParams['order'] = data.order!.first.field;
       }
       if (data.filter?.isNotEmpty == true) {
-        for (Filter item in data.filter!) {
+        for (PgcConditionFilter item in data.filter!) {
           indexParams['${item.field}'] = item.values?.firstOrNull?.keyword;
         }
       }
@@ -41,7 +46,8 @@ class PgcIndexController extends CommonListController {
   }
 
   @override
-  Future<LoadingState> customGetData() => BangumiHttp.pgcIndexResult(
+  Future<LoadingState<PgcIndexResult>> customGetData() =>
+      PgcHttp.pgcIndexResult(
         page: page,
         params: indexParams,
         seasonType: indexType == null ? 1 : null,
@@ -50,16 +56,10 @@ class PgcIndexController extends CommonListController {
       );
 
   @override
-  List? getDataList(response) {
-    return response['list'];
-  }
-
-  @override
-  bool customHandleResponse(bool isRefresh, Success response) {
-    if (response.response['has_next'] == null ||
-        response.response['has_next'] == 0) {
+  List<PgcIndexItem>? getDataList(PgcIndexResult response) {
+    if (response.hasNext == null || response.hasNext == 0) {
       isEnd = true;
     }
-    return false;
+    return response.list;
   }
 }

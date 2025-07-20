@@ -4,9 +4,10 @@ import 'package:PiliPlus/models/common/dynamic/up_panel_position.dart';
 import 'package:PiliPlus/pages/dynamics/controller.dart';
 import 'package:PiliPlus/pages/dynamics/widgets/up_panel.dart';
 import 'package:PiliPlus/pages/dynamics_create/view.dart';
-import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/pages/dynamics_tab/view.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:easy_debounce/easy_throttle.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide DraggableScrollableSheet;
 import 'package:get/get.dart';
 
 class DynamicsPage extends StatefulWidget {
@@ -39,13 +40,8 @@ class _DynamicsPageState extends State<DynamicsPage>
               }),
             ),
             onPressed: () {
-              if (_dynamicsController.isLogin.value) {
-                showModalBottomSheet(
-                  context: context,
-                  useSafeArea: true,
-                  isScrollControlled: true,
-                  builder: (context) => const CreateDynPanel(),
-                );
+              if (_dynamicsController.accountService.isLogin.value) {
+                CreateDynPanel.onCreateDyn(context);
               }
             },
             icon: Icon(
@@ -60,8 +56,7 @@ class _DynamicsPageState extends State<DynamicsPage>
   @override
   void initState() {
     super.initState();
-    if (GStorage.setting
-        .get(SettingBoxKey.dynamicsShowAllFollowedUp, defaultValue: false)) {
+    if (Pref.dynamicsShowAllFollowedUp) {
       _dynamicsController.scrollController.addListener(listener);
     }
   }
@@ -83,11 +78,10 @@ class _DynamicsPageState extends State<DynamicsPage>
 
   Widget upPanelPart(ThemeData theme) {
     bool isTop = upPanelPosition == UpPanelPosition.top;
+    bool needBg = upPanelPosition.index > 1;
     return Material(
-      //抽屉模式增加底色
-      color: isTop || upPanelPosition.index > 1
-          ? theme.colorScheme.surface
-          : Colors.transparent,
+      color: needBg ? theme.colorScheme.surface : null,
+      type: needBg ? MaterialType.canvas : MaterialType.transparency,
       child: SizedBox(
         width: isTop ? null : 64,
         height: isTop ? 76 : null,
@@ -104,9 +98,7 @@ class _DynamicsPageState extends State<DynamicsPage>
                 ),
               );
             } else {
-              return UpPanel(
-                dynamicsController: _dynamicsController,
-              );
+              return UpPanel(dynamicsController: _dynamicsController);
             }
           },
         ),
@@ -119,13 +111,14 @@ class _DynamicsPageState extends State<DynamicsPage>
     super.build(context);
     ThemeData theme = Theme.of(context);
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         leading: upPanelPosition == UpPanelPosition.rightDrawer
             ? _createDynamicBtn(theme, false)
             : null,
         leadingWidth: 50,
         toolbarHeight: 50,
+        backgroundColor: Colors.transparent,
         title: SizedBox(
           height: 50,
           child: TabBar(
@@ -141,7 +134,7 @@ class _DynamicsPageState extends State<DynamicsPage>
                 TabBarTheme.of(context).labelStyle?.copyWith(fontSize: 13) ??
                     const TextStyle(fontSize: 13),
             tabs:
-                DynamicsTabType.values.map((e) => Tab(text: e.labels)).toList(),
+                DynamicsTabType.values.map((e) => Tab(text: e.label)).toList(),
             onTap: (index) {
               if (!_dynamicsController.tabController.indexIsChanging) {
                 _dynamicsController.animateToTop();
@@ -171,7 +164,9 @@ class _DynamicsPageState extends State<DynamicsPage>
                 Expanded(
                   child: videoTabBarView(
                     controller: _dynamicsController.tabController,
-                    children: _dynamicsController.tabsPageList,
+                    children: DynamicsTabType.values
+                        .map((e) => DynamicsTabPage(dynamicsType: e))
+                        .toList(),
                   ),
                 ),
               ],

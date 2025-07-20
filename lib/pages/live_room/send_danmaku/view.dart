@@ -1,24 +1,23 @@
 import 'dart:async';
 
-import 'package:PiliPlus/common/widgets/button/toolbar_icon_button.dart';
+import 'package:PiliPlus/common/widgets/text_field/text_field.dart';
 import 'package:PiliPlus/http/live.dart';
 import 'package:PiliPlus/models/common/publish_panel_type.dart';
-import 'package:PiliPlus/pages/common/common_publish_page.dart';
+import 'package:PiliPlus/pages/common/publish/common_rich_text_pub_page.dart';
 import 'package:PiliPlus/pages/live_emote/controller.dart';
 import 'package:PiliPlus/pages/live_emote/view.dart';
 import 'package:PiliPlus/pages/live_room/controller.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/material.dart' hide TextField;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart' hide MultipartFile;
 
-class LiveSendDmPanel extends CommonPublishPage {
+class LiveSendDmPanel extends CommonRichTextPubPage {
   final bool fromEmote;
   final LiveRoomController liveRoomController;
 
   const LiveSendDmPanel({
     super.key,
-    super.initialValue,
+    super.items,
     super.onSave,
     this.fromEmote = false,
     required this.liveRoomController,
@@ -28,14 +27,13 @@ class LiveSendDmPanel extends CommonPublishPage {
   State<LiveSendDmPanel> createState() => _ReplyPageState();
 }
 
-class _ReplyPageState extends CommonPublishPageState<LiveSendDmPanel> {
+class _ReplyPageState extends CommonRichTextPubPageState<LiveSendDmPanel> {
   LiveRoomController get liveRoomController => widget.liveRoomController;
 
   @override
   void initState() {
     super.initState();
     if (widget.fromEmote) {
-      selectKeyboard.value = false;
       updatePanelType(PanelType.emoji);
     }
   }
@@ -67,7 +65,7 @@ class _ReplyPageState extends CommonPublishPageState<LiveSendDmPanel> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ...buildInputView(theme),
-              buildPanelContainer(Colors.transparent),
+              buildPanelContainer(theme, Colors.transparent),
             ],
           ),
         ),
@@ -84,7 +82,6 @@ class _ReplyPageState extends CommonPublishPageState<LiveSendDmPanel> {
             message: emote.emoticonUnique!,
             dmType: 1,
             emoticonOptions: '[object Object]',
-            emoticonUnique: emote.emoji,
           );
         },
       );
@@ -100,25 +97,17 @@ class _ReplyPageState extends CommonPublishPageState<LiveSendDmPanel> {
             onPointerUp: (event) {
               if (readOnly.value) {
                 updatePanelType(PanelType.keyboard);
-                selectKeyboard.value = true;
               }
             },
             child: Obx(
-              () => TextField(
+              () => RichTextField(
+                key: key,
                 controller: editController,
                 minLines: 1,
                 maxLines: 2,
                 autofocus: false,
                 readOnly: readOnly.value,
-                onChanged: (value) {
-                  bool isEmpty = value.trim().isEmpty;
-                  if (!isEmpty && !enablePublish.value) {
-                    enablePublish.value = true;
-                  } else if (isEmpty && enablePublish.value) {
-                    enablePublish.value = false;
-                  }
-                  liveRoomController.savedDanmaku = value;
-                },
+                onChanged: onChanged,
                 focusNode: focusNode,
                 decoration: const InputDecoration(
                   hintText: "输入弹幕内容",
@@ -126,7 +115,7 @@ class _ReplyPageState extends CommonPublishPageState<LiveSendDmPanel> {
                   hintStyle: TextStyle(fontSize: 14),
                 ),
                 style: theme.textTheme.bodyLarge,
-                inputFormatters: [LengthLimitingTextInputFormatter(20)],
+                // inputFormatters: [LengthLimitingTextInputFormatter(20)],
               ),
             ),
           ),
@@ -142,33 +131,7 @@ class _ReplyPageState extends CommonPublishPageState<LiveSendDmPanel> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Obx(
-              () => ToolbarIconButton(
-                tooltip: '输入',
-                onPressed: () {
-                  if (!selectKeyboard.value) {
-                    selectKeyboard.value = true;
-                    updatePanelType(PanelType.keyboard);
-                  }
-                },
-                icon: const Icon(Icons.keyboard, size: 22),
-                selected: selectKeyboard.value,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Obx(
-              () => ToolbarIconButton(
-                tooltip: '表情',
-                onPressed: () {
-                  if (selectKeyboard.value) {
-                    selectKeyboard.value = false;
-                    updatePanelType(PanelType.emoji);
-                  }
-                },
-                icon: const Icon(Icons.emoji_emotions, size: 22),
-                selected: !selectKeyboard.value,
-              ),
-            ),
+            emojiBtn,
             const Spacer(),
             Obx(
               () => FilledButton.tonal(
@@ -189,24 +152,31 @@ class _ReplyPageState extends CommonPublishPageState<LiveSendDmPanel> {
 
   @override
   Future<void> onCustomPublish({
-    required String message,
+    String? message,
     List? pictures,
     int? dmType,
     emoticonOptions,
-    emoticonUnique,
   }) async {
     final res = await LiveHttp.sendLiveMsg(
       roomId: liveRoomController.roomId,
-      msg: message,
+      msg: message ?? editController.rawText,
       dmType: dmType,
       emoticonOptions: emoticonOptions,
     );
     if (res['status']) {
+      hasPub = true;
       Get.back();
-      liveRoomController.savedDanmaku = null;
+      liveRoomController
+        ..savedDanmaku?.clear()
+        ..savedDanmaku = null;
       SmartDialog.showToast('发送成功');
     } else {
       SmartDialog.showToast(res['msg']);
     }
+  }
+
+  @override
+  Future<void> onMention([bool fromClick = false]) {
+    return Future.value();
   }
 }

@@ -2,7 +2,8 @@ import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
 import 'package:PiliPlus/common/widgets/image/image_save.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
-import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/models_new/space/space_season_series/season.dart';
+import 'package:PiliPlus/utils/date_util.dart';
 import 'package:flutter/material.dart';
 
 class SeasonSeriesCard extends StatelessWidget {
@@ -11,67 +12,70 @@ class SeasonSeriesCard extends StatelessWidget {
     required this.item,
     required this.onTap,
   });
-  final dynamic item;
+  final SpaceSsModel item;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onLongPress: () => imageSaveDialog(
-        title: item['meta']['name'],
-        cover: item['meta']['cover'],
-      ),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: StyleString.safeSpace,
-          vertical: 5,
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onLongPress: () => imageSaveDialog(
+          title: item.meta!.name,
+          cover: item.meta!.cover,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: StyleString.aspectRatio,
-              child: LayoutBuilder(
-                builder: (BuildContext context, BoxConstraints boxConstraints) {
-                  final double maxWidth = boxConstraints.maxWidth;
-                  final double maxHeight = boxConstraints.maxHeight;
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      NetworkImgLayer(
-                        src: item['meta']['cover'],
-                        width: maxWidth,
-                        height: maxHeight,
-                      ),
-                      PBadge(
-                        text:
-                            '${item['meta']['season_id'] != null ? '合集' : '列表'}: ${item['meta']['total']}',
-                        bottom: 6.0,
-                        right: 6.0,
-                      ),
-                    ],
-                  );
-                },
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: StyleString.safeSpace,
+            vertical: 5,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: StyleString.aspectRatio,
+                child: LayoutBuilder(
+                  builder:
+                      (BuildContext context, BoxConstraints boxConstraints) {
+                    final double maxWidth = boxConstraints.maxWidth;
+                    final double maxHeight = boxConstraints.maxHeight;
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        NetworkImgLayer(
+                          src: item.meta!.cover,
+                          width: maxWidth,
+                          height: maxHeight,
+                        ),
+                        PBadge(
+                          text:
+                              '${item.meta!.seasonId != null ? '合集' : '列表'}: ${item.meta!.total}',
+                          bottom: 6.0,
+                          right: 6.0,
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            videoContent(context),
-          ],
+              const SizedBox(width: 10),
+              content(context),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget videoContent(context) {
+  Widget content(BuildContext context) {
     final theme = Theme.of(context);
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            item['meta']['name'],
+            item.meta!.name!,
             textAlign: TextAlign.start,
             style: TextStyle(
               fontSize: theme.textTheme.bodyMedium!.fontSize,
@@ -83,7 +87,7 @@ class SeasonSeriesCard extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            Utils.dateFormat(item['meta']['ptime']),
+            DateUtil.dateFormat(item.meta!.ptime),
             maxLines: 1,
             style: TextStyle(
               fontSize: 12,

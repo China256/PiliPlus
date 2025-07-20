@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/widgets/dialog/report.dart';
 import 'package:PiliPlus/common/widgets/pendant_avatar.dart';
 import 'package:PiliPlus/http/constants.dart';
@@ -8,11 +9,12 @@ import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
 import 'package:PiliPlus/pages/dynamics/controller.dart';
 import 'package:PiliPlus/pages/save_panel/view.dart';
+import 'package:PiliPlus/utils/accounts.dart';
+import 'package:PiliPlus/utils/date_util.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
-import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -22,7 +24,7 @@ import 'package:get/get.dart';
 class AuthorPanel extends StatelessWidget {
   final DynamicItemModel item;
   final Function? addBannedList;
-  final String? source;
+  final bool isDetail;
   final ValueChanged? onRemove;
   final bool isSave;
   final Function(bool isTop, dynamic dynId)? onSetTop;
@@ -32,7 +34,7 @@ class AuthorPanel extends StatelessWidget {
     super.key,
     required this.item,
     this.addBannedList,
-    this.source,
+    this.isDetail = false,
     this.onRemove,
     this.isSave = false,
     this.onSetTop,
@@ -44,7 +46,7 @@ class AuthorPanel extends StatelessWidget {
     Widget avatar = PendantAvatar(
       avatar: item.modules.moduleAuthor?.face,
       size: pendant.isNullOrEmpty ? 40 : 34,
-      isVip: null, // item.modules.moduleAuthor!.vip['status'] > 0
+      isVip: null,
       officialType: null, // 已被注释
       garbPendantImage: pendant,
     );
@@ -59,11 +61,9 @@ class AuthorPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final pubTime = item.modules.moduleAuthor?.pubTs != null
         ? isSave
-            ? DateTime.fromMillisecondsSinceEpoch(
-                    item.modules.moduleAuthor!.pubTs! * 1000)
-                .toString()
-                .substring(0, 19)
-            : Utils.dateFormat(item.modules.moduleAuthor!.pubTs)
+            ? DateUtil.format(item.modules.moduleAuthor!.pubTs,
+                format: DateUtil.longFormatDs)
+            : DateUtil.dateFormat(item.modules.moduleAuthor!.pubTs)
         : item.modules.moduleAuthor?.pubTime;
     return Stack(
       clipBehavior: Clip.none,
@@ -73,18 +73,13 @@ class AuthorPanel extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: item.modules.moduleAuthor!.type == 'AUTHOR_TYPE_PGC' ||
-                    item.modules.moduleAuthor!.type == 'AUTHOR_TYPE_UGC_SEASON'
-                ? null
-                : () {
+            onTap: item.modules.moduleAuthor!.type == 'AUTHOR_TYPE_NORMAL'
+                ? () {
                     feedBack();
                     Get.toNamed(
-                      '/member?mid=${item.modules.moduleAuthor!.mid}',
-                      arguments: {
-                        'face': item.modules.moduleAuthor!.face,
-                      },
-                    );
-                  },
+                        '/member?mid=${item.modules.moduleAuthor!.mid}');
+                  }
+                : null,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -120,7 +115,7 @@ class AuthorPanel extends StatelessWidget {
         ),
         Align(
           alignment: Alignment.centerRight,
-          child: source != 'detail' && item.modules.moduleTag?.text != null
+          child: !isDetail && item.modules.moduleTag?.text != null
               ? Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -162,31 +157,28 @@ class AuthorPanel extends StatelessWidget {
                           children: [
                             CachedNetworkImage(
                               height: 32,
-                              imageUrl: (item.modules.moduleAuthor!
-                                      .decorate!['card_url'] as String)
-                                  .http2https,
+                              imageUrl: item.modules.moduleAuthor!.decorate!
+                                  .cardUrl.http2https,
                             ),
-                            if ((item.modules.moduleAuthor?.decorate?['fan']
-                                        ?['num_str'] as String?)
+                            if (item.modules.moduleAuthor?.decorate?.fan?.numStr
                                     ?.isNotEmpty ==
                                 true)
                               Padding(
                                 padding: const EdgeInsets.only(right: 32),
                                 child: Text(
-                                  '${item.modules.moduleAuthor!.decorate!['fan']['num_str']}',
+                                  '${item.modules.moduleAuthor!.decorate!.fan!.numStr}',
                                   style: TextStyle(
                                     height: 1,
                                     fontSize: 11,
                                     fontFamily: 'digital_id_num',
-                                    color: (item.modules.moduleAuthor!
-                                                        .decorate!['fan']
-                                                    ['color'] as String?)
+                                    color: item.modules.moduleAuthor!.decorate!
+                                                .fan?.color
                                                 ?.startsWith('#') ==
                                             true
                                         ? Color(
                                             int.parse(
                                               item.modules.moduleAuthor!
-                                                  .decorate!['fan']['color']
+                                                  .decorate!.fan!.color!
                                                   .replaceFirst('#', '0xFF'),
                                             ),
                                           )
@@ -240,22 +232,19 @@ class AuthorPanel extends StatelessWidget {
       useSafeArea: true,
       isScrollControlled: true,
       constraints: BoxConstraints(
-        maxWidth: min(640, min(Get.width, Get.height)),
+        maxWidth: min(640, context.mediaQueryShortestSide),
       ),
       builder: (context1) {
         final theme = Theme.of(context);
         return Padding(
           padding:
-              EdgeInsets.only(bottom: MediaQuery.of(context1).padding.bottom),
+              EdgeInsets.only(bottom: MediaQuery.paddingOf(context1).bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               InkWell(
                 onTap: Get.back,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(18),
-                  topRight: Radius.circular(18),
-                ),
+                borderRadius: StyleString.bottomSheetRadius,
                 child: Container(
                   height: 35,
                   padding: const EdgeInsets.only(bottom: 2),

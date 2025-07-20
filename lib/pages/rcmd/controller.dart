@@ -1,15 +1,14 @@
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
-import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 
 class RcmdController extends CommonListController {
-  late bool enableSaveLastData = GStorage.setting
-      .get(SettingBoxKey.enableSaveLastData, defaultValue: false);
-  final bool appRcmd = GStorage.appRcmd;
+  late bool enableSaveLastData = Pref.enableSaveLastData;
+  final bool appRcmd = Pref.appRcmd;
 
   int? lastRefreshAt;
-  late bool savedRcmdTip = GStorage.savedRcmdTip;
+  late bool savedRcmdTip = Pref.savedRcmdTip;
 
   @override
   void onInit() {
@@ -27,8 +26,8 @@ class RcmdController extends CommonListController {
 
   @override
   void handleListResponse(List dataList) {
-    if (enableSaveLastData && page == 0 && loadingState.value is Success) {
-      List? currentList = (loadingState.value as Success).response;
+    if (enableSaveLastData && page == 0 && loadingState.value.isSuccess) {
+      List? currentList = loadingState.value.data;
       if (currentList?.isNotEmpty == true) {
         if (savedRcmdTip) {
           lastRefreshAt = dataList.length;

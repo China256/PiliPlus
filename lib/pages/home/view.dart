@@ -6,7 +6,6 @@ import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/pages/home/controller.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
-import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -32,20 +31,19 @@ class _HomePageState extends State<HomePage>
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      appBar: AppBar(toolbarHeight: 0),
-      body: Column(
-        children: [
-          if (!_homeController.useSideBar &&
-              context.orientation == Orientation.portrait)
-            customAppBar(theme),
-          if (_homeController.tabs.length > 1)
-            Material(
-              color: theme.colorScheme.surface,
-              child: Container(
+    return Column(
+      children: [
+        if (!_homeController.useSideBar &&
+            context.orientation == Orientation.portrait)
+          customAppBar(theme),
+        if (_homeController.tabs.length > 1)
+          Material(
+            color: theme.colorScheme.surface,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: SizedBox(
                 height: 42,
-                padding: const EdgeInsets.only(top: 4),
+                width: double.infinity,
                 child: TabBar(
                   controller: _homeController.tabController,
                   tabs: [
@@ -54,28 +52,27 @@ class _HomePageState extends State<HomePage>
                   isScrollable: true,
                   dividerColor: Colors.transparent,
                   dividerHeight: 0,
-                  enableFeedback: true,
                   splashBorderRadius: StyleString.mdRadius,
                   tabAlignment: TabAlignment.center,
-                  onTap: (value) {
+                  onTap: (_) {
                     feedBack();
-                    if (_homeController.tabController.indexIsChanging.not) {
+                    if (!_homeController.tabController.indexIsChanging) {
                       _homeController.animateToTop();
                     }
                   },
                 ),
               ),
-            )
-          else
-            const SizedBox(height: 6),
-          Expanded(
-            child: tabBarView(
-              controller: _homeController.tabController,
-              children: _homeController.tabs.map((e) => e.page).toList(),
             ),
+          )
+        else
+          const SizedBox(height: 6),
+        Expanded(
+          child: tabBarView(
+            controller: _homeController.tabController,
+            children: _homeController.tabs.map((e) => e.page).toList(),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -85,7 +82,7 @@ class _HomePageState extends State<HomePage>
         searchBar(theme),
         const SizedBox(width: 4),
         Obx(
-          () => _homeController.isLogin.value
+          () => _homeController.accountService.isLogin.value
               ? msgBadge(_mainController)
               : const SizedBox.shrink(),
         ),
@@ -93,7 +90,7 @@ class _HomePageState extends State<HomePage>
         Semantics(
           label: "我的",
           child: Obx(
-            () => _homeController.isLogin.value
+            () => _homeController.accountService.isLogin.value
                 ? Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -101,19 +98,17 @@ class _HomePageState extends State<HomePage>
                         type: ImageType.avatar,
                         width: 34,
                         height: 34,
-                        src: _homeController.userFace.value,
+                        src: _homeController.accountService.face.value,
                       ),
                       Positioned.fill(
                         child: Material(
-                          color: Colors.transparent,
+                          type: MaterialType.transparency,
                           child: InkWell(
                             onTap: () =>
                                 _homeController.showUserInfoDialog(context),
                             splashColor: theme.colorScheme.primaryContainer
                                 .withValues(alpha: 0.3),
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(50),
-                            ),
+                            customBorder: const CircleBorder(),
                           ),
                         ),
                       ),
@@ -179,15 +174,13 @@ class _HomePageState extends State<HomePage>
 
   Widget searchBar(ThemeData theme) {
     return Expanded(
-      child: Container(
+      child: SizedBox(
         height: 44,
-        clipBehavior: Clip.hardEdge,
-        decoration: const BoxDecoration(
-          borderRadius: BorderRadius.all(Radius.circular(25)),
-        ),
         child: Material(
+          borderRadius: const BorderRadius.all(Radius.circular(25)),
           color: theme.colorScheme.onSecondaryContainer.withValues(alpha: 0.05),
           child: InkWell(
+            borderRadius: const BorderRadius.all(Radius.circular(25)),
             splashColor:
                 theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
             onTap: () => Get.toNamed(

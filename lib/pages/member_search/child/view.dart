@@ -8,8 +8,8 @@ import 'package:PiliPlus/models/common/member/search_type.dart';
 import 'package:PiliPlus/pages/dynamics/widgets/dynamic_panel.dart';
 import 'package:PiliPlus/pages/dynamics_tab/view.dart';
 import 'package:PiliPlus/pages/member_search/child/controller.dart';
+import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/grid.dart';
-import 'package:PiliPlus/utils/storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:waterfall_flow/waterfall_flow.dart';
@@ -30,8 +30,6 @@ class MemberSearchChildPage extends StatefulWidget {
 
 class _MemberSearchChildPageState extends State<MemberSearchChildPage>
     with AutomaticKeepAliveClientMixin {
-  late final bool dynamicsWaterfallFlow = GStorage.setting
-      .get(SettingBoxKey.dynamicsWaterfallFlow, defaultValue: true);
   MemberSearchChildController get _controller => widget.controller;
 
   @override
@@ -41,6 +39,7 @@ class _MemberSearchChildPageState extends State<MemberSearchChildPage>
       onRefresh: _controller.onRefresh,
       child: CustomScrollView(
         controller: _controller.scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
             padding: EdgeInsets.only(
@@ -66,7 +65,7 @@ class _MemberSearchChildPageState extends State<MemberSearchChildPage>
           ),
         ),
       MemberSearchType.dynamic =>
-        DynamicsTabPage.dynSkeleton(dynamicsWaterfallFlow),
+        DynamicsTabPage.dynSkeleton(GlobalData().dynamicsWaterfallFlow),
     };
   }
 
@@ -91,7 +90,7 @@ class _MemberSearchChildPageState extends State<MemberSearchChildPage>
                         childCount: response!.length,
                       ),
                     ),
-                  MemberSearchType.dynamic => dynamicsWaterfallFlow
+                  MemberSearchType.dynamic => GlobalData().dynamicsWaterfallFlow
                       ? SliverWaterfallFlow.extent(
                           maxCrossAxisExtent: Grid.smallCardWidth * 2,
                           crossAxisSpacing: StyleString.safeSpace,

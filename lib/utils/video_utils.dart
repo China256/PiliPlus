@@ -1,25 +1,26 @@
 import 'package:PiliPlus/models/common/video/cdn_type.dart';
-import 'package:PiliPlus/models/live/live_room/room_info.dart';
 import 'package:PiliPlus/models/video/play/url.dart';
+import 'package:PiliPlus/models_new/live/live_room_play_info/codec.dart';
 import 'package:PiliPlus/utils/extension.dart';
-import 'package:PiliPlus/utils/storage.dart';
-import 'package:flutter/material.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 
 class VideoUtils {
+  static String cdnService = Pref.defaultCDNService;
+  static bool disableAudioCDN = Pref.disableAudioCDN;
+
   static String getCdnUrl(dynamic item, [String? defaultCDNService]) {
     String? backupUrl;
     String? videoUrl;
-    defaultCDNService ??= GStorage.defaultCDNService;
+    defaultCDNService ??= cdnService;
     if (item is AudioItem) {
-      if (GStorage.setting
-          .get(SettingBoxKey.disableAudioCDN, defaultValue: true)) {
-        return item.backupUrl.isNullOrEmpty.not
+      if (disableAudioCDN) {
+        return item.backupUrl?.isNotEmpty == true
             ? item.backupUrl!
             : item.baseUrl ?? "";
       }
     }
     if (defaultCDNService == CDNService.baseUrl.code) {
-      return (item.baseUrl as String?).isNullOrEmpty.not
+      return (item.baseUrl as String?)?.isNotEmpty == true
           ? item.baseUrl
           : item.backupUrl ?? "";
     }
@@ -31,17 +32,17 @@ class VideoUtils {
       backupUrl = item.backupUrl;
     }
     if (defaultCDNService == CDNService.backupUrl.code) {
-      return backupUrl.isNullOrEmpty.not ? backupUrl : item.baseUrl ?? "";
+      return backupUrl?.isNotEmpty == true ? backupUrl : item.baseUrl ?? "";
     }
-    videoUrl = backupUrl.isNullOrEmpty ? item.baseUrl : backupUrl;
+    videoUrl = backupUrl?.isNotEmpty == true ? backupUrl : item.baseUrl;
 
     if (videoUrl.isNullOrEmpty) {
       return "";
     }
-    debugPrint("videoUrl:$videoUrl");
+    // if (kDebugMode) debugPrint("videoUrl:$videoUrl");
 
     String defaultCDNHost = CDNService.fromCode(defaultCDNService).host;
-    debugPrint("defaultCDNHost:$defaultCDNHost");
+    // if (kDebugMode) debugPrint("defaultCDNHost:$defaultCDNHost");
     if (videoUrl!.contains("szbdyd.com")) {
       final uri = Uri.parse(videoUrl);
       String hostname = uri.queryParameters['xy_usource'] ?? defaultCDNHost;
@@ -54,7 +55,7 @@ class VideoUtils {
       // videoUrl =
       //     'https://proxy-tf-all-ws.bilivideo.com/?url=${Uri.encodeComponent(videoUrl)}';
     }
-    debugPrint("videoUrl:$videoUrl");
+    // if (kDebugMode) debugPrint("videoUrl:$videoUrl");
 
     // /// 先获取backupUrl 一般是upgcxcode地址 播放更稳定
     // if (item is VideoItem) {

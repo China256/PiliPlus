@@ -2,22 +2,19 @@ import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/http/api.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
-import 'package:PiliPlus/models/video/reply/data.dart';
-import 'package:PiliPlus/models/video/reply/emote.dart';
-import 'package:PiliPlus/models/video/reply/item.dart';
+import 'package:PiliPlus/models_new/emote/data.dart';
+import 'package:PiliPlus/models_new/emote/package.dart';
+import 'package:PiliPlus/models_new/reply/data.dart';
+import 'package:PiliPlus/models_new/reply/reply.dart';
+import 'package:PiliPlus/models_new/reply2reply/data.dart';
+import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/accounts/account.dart';
-import 'package:PiliPlus/utils/extension.dart';
-import 'package:PiliPlus/utils/storage.dart';
 import 'package:dio/dio.dart';
 
 class ReplyHttp {
-  static Options get _options =>
-      Options(extra: {'account': AnonymousAccount()});
+  static final Options _options =
+      Options(extra: {'account': AnonymousAccount(), 'checkReply': true});
 
-  static RegExp replyRegExp =
-      RegExp(GStorage.banWordForReply, caseSensitive: false);
-
-  @Deprecated('Use replyListGrpc instead')
   static Future<LoadingState> replyList({
     required bool isLogin,
     required int oid,
@@ -38,7 +35,7 @@ class ReplyHttp {
                   '{"offset":"${nextOffset.replaceAll('"', '\\"')}"}',
               'mode': sort + 2, //2:按时间排序；3：按热度排序
             },
-            options: isLogin.not ? _options : null,
+            options: !isLogin ? _options : null,
           )
         : await Request().get(
             Api.replyList,
@@ -49,72 +46,72 @@ class ReplyHttp {
               'pn': page,
               'ps': 20,
             },
-            options: isLogin.not ? _options : null,
+            options: !isLogin ? _options : null,
           );
     if (res.data['code'] == 0) {
       ReplyData replyData = ReplyData.fromJson(res.data['data']);
-      if (enableFilter != false && replyRegExp.pattern.isNotEmpty) {
-        // topReplies
-        if (replyData.topReplies?.isNotEmpty == true) {
-          replyData.topReplies!.removeWhere((item) {
-            bool hasMatch = replyRegExp.hasMatch(item.content?.message ?? '');
-            // remove subreplies
-            if (hasMatch.not) {
-              if (item.replies?.isNotEmpty == true) {
-                item.replies!.removeWhere((item) =>
-                    replyRegExp.hasMatch(item.content?.message ?? ''));
-              }
-            }
-            return hasMatch;
-          });
-        }
+      // if (enableFilter != false && replyRegExp.pattern.isNotEmpty) {
+      //   // topReplies
+      //   if (replyData.topReplies?.isNotEmpty == true) {
+      //     replyData.topReplies!.removeWhere((item) {
+      //       bool hasMatch = replyRegExp.hasMatch(item.content?.message ?? '');
+      //       // remove subreplies
+      //       if (!hasMatch) {
+      //         if (item.replies?.isNotEmpty == true) {
+      //           item.replies!.removeWhere((item) =>
+      //               replyRegExp.hasMatch(item.content?.message ?? ''));
+      //         }
+      //       }
+      //       return hasMatch;
+      //     });
+      //   }
 
-        // replies
-        if (replyData.replies?.isNotEmpty == true) {
-          replyData.replies!.removeWhere((item) {
-            bool hasMatch = replyRegExp.hasMatch(item.content?.message ?? '');
-            // remove subreplies
-            if (hasMatch.not) {
-              if (item.replies?.isNotEmpty == true) {
-                item.replies!.removeWhere((item) =>
-                    replyRegExp.hasMatch(item.content?.message ?? ''));
-              }
-            }
-            return hasMatch;
-          });
-        }
-      }
+      //   // replies
+      //   if (replyData.replies?.isNotEmpty == true) {
+      //     replyData.replies!.removeWhere((item) {
+      //       bool hasMatch = replyRegExp.hasMatch(item.content?.message ?? '');
+      //       // remove subreplies
+      //       if (!hasMatch) {
+      //         if (item.replies?.isNotEmpty == true) {
+      //           item.replies!.removeWhere((item) =>
+      //               replyRegExp.hasMatch(item.content?.message ?? ''));
+      //         }
+      //       }
+      //       return hasMatch;
+      //     });
+      //   }
+      // }
 
-      // antiGoodsReply
-      if (antiGoodsReply) {
-        // topReplies
-        if (replyData.topReplies?.isNotEmpty == true) {
-          replyData.topReplies!.removeWhere((item) {
-            bool hasMatch = needRemove(item);
-            // remove subreplies
-            if (hasMatch.not) {
-              if (item.replies?.isNotEmpty == true) {
-                item.replies!.removeWhere(needRemove);
-              }
-            }
-            return hasMatch;
-          });
-        }
+      // // antiGoodsReply
+      // if (antiGoodsReply) {
+      //   // topReplies
+      //   if (replyData.topReplies?.isNotEmpty == true) {
+      //     replyData.topReplies!.removeWhere((item) {
+      //       bool hasMatch = needRemove(item);
+      //       // remove subreplies
+      //       if (!hasMatch) {
+      //         if (item.replies?.isNotEmpty == true) {
+      //           item.replies!.removeWhere(needRemove);
+      //         }
+      //       }
+      //       return hasMatch;
+      //     });
+      //   }
 
-        // replies
-        if (replyData.replies?.isNotEmpty == true) {
-          replyData.replies!.removeWhere((item) {
-            bool hasMatch = needRemove(item);
-            // remove subreplies
-            if (hasMatch.not) {
-              if (item.replies?.isNotEmpty == true) {
-                item.replies!.removeWhere(needRemove);
-              }
-            }
-            return hasMatch;
-          });
-        }
-      }
+      //   // replies
+      //   if (replyData.replies?.isNotEmpty == true) {
+      //     replyData.replies!.removeWhere((item) {
+      //       bool hasMatch = needRemove(item);
+      //       // remove subreplies
+      //       if (!hasMatch) {
+      //         if (item.replies?.isNotEmpty == true) {
+      //           item.replies!.removeWhere(needRemove);
+      //         }
+      //       }
+      //       return hasMatch;
+      //     });
+      //   }
+      // }
       return Success(replyData);
     } else {
       return Error(res.data['message']);
@@ -137,7 +134,6 @@ class ReplyHttp {
     return false;
   }
 
-  @Deprecated('Use replyReplyListGrpc instead')
   static Future<LoadingState<ReplyReplyData>> replyReplyList({
     required bool isLogin,
     required int oid,
@@ -158,21 +154,21 @@ class ReplyHttp {
         'sort': 1,
         if (isLogin) 'csrf': Accounts.main.csrf,
       },
-      options: isLogin.not ? _options : null,
+      options: !isLogin ? _options : null,
     );
     if (res.data['code'] == 0) {
       ReplyReplyData replyData = ReplyReplyData.fromJson(res.data['data']);
-      if (filterBanWord != false && replyRegExp.pattern.isNotEmpty) {
-        if (replyData.replies?.isNotEmpty == true) {
-          replyData.replies!.removeWhere(
-              (item) => replyRegExp.hasMatch(item.content?.message ?? ''));
-        }
-      }
-      if (antiGoodsReply) {
-        if (replyData.replies?.isNotEmpty == true) {
-          replyData.replies!.removeWhere(needRemove);
-        }
-      }
+      // if (filterBanWord != false && replyRegExp.pattern.isNotEmpty) {
+      //   if (replyData.replies?.isNotEmpty == true) {
+      //     replyData.replies!.removeWhere(
+      //         (item) => replyRegExp.hasMatch(item.content?.message ?? ''));
+      //   }
+      // }
+      // if (antiGoodsReply) {
+      //   if (replyData.replies?.isNotEmpty == true) {
+      //     replyData.replies!.removeWhere(needRemove);
+      //   }
+      // }
       return Success(replyData);
     } else {
       return Error(
@@ -233,7 +229,7 @@ class ReplyHttp {
     }
   }
 
-  static Future<LoadingState<List<Packages>?>> getEmoteList(
+  static Future<LoadingState<List<Package>?>> getEmoteList(
       {String? business}) async {
     var res = await Request().get(Api.myEmote, queryParameters: {
       'business': business ?? 'reply',

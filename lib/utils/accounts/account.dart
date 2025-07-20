@@ -1,21 +1,21 @@
 import 'package:PiliPlus/models/common/account_type.dart';
-import 'package:PiliPlus/utils/storage.dart';
-import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/accounts.dart';
+import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:hive/hive.dart';
 
 abstract class Account {
-  bool get isLogin;
-  DefaultCookieJar get cookieJar;
-  String? get accessKey;
-  String? get refresh;
-  Set<AccountType> get type;
+  final bool isLogin = false;
+  late final DefaultCookieJar cookieJar;
+  String? accessKey;
+  String? refresh;
+  late final Set<AccountType> type;
 
-  int get mid;
-  String get csrf;
-  Map<String, String> get headers;
+  final int mid = 0;
+  late String csrf;
+  final Map<String, String> headers = const {};
 
-  // bool activited = false;
+  bool activited = false;
 
   Future<void> delete();
   Future<void> onChange();
@@ -29,16 +29,19 @@ class LoginAccount implements Account {
   final bool isLogin = true;
   @override
   @HiveField(0)
-  final DefaultCookieJar cookieJar;
+  late final DefaultCookieJar cookieJar;
   @override
   @HiveField(1)
-  final String? accessKey;
+  String? accessKey;
   @override
   @HiveField(2)
-  final String? refresh;
+  String? refresh;
   @override
   @HiveField(3)
-  final Set<AccountType> type;
+  late final Set<AccountType> type;
+
+  @override
+  bool activited = false;
 
   @override
   late final int mid = int.parse(_midStr);
@@ -46,10 +49,10 @@ class LoginAccount implements Account {
   @override
   late final Map<String, String> headers = {
     'x-bili-mid': _midStr,
-    'x-bili-aurora-eid': Utils.genAuroraEid(mid),
+    'x-bili-aurora-eid': IdUtils.genAuroraEid(mid),
   };
   @override
-  late final String csrf =
+  late String csrf =
       cookieJar.domainCookies['bilibili.com']!['/']!['bili_jct']!.cookie.value;
 
   @override
@@ -71,21 +74,21 @@ class LoginAccount implements Account {
 
   late final Box<LoginAccount> _box = Accounts.account;
 
-  LoginAccount(
-    this.cookieJar,
-    this.accessKey,
-    this.refresh, [
-    Set<AccountType>? type,
-  ]) : type = type ?? {} {
+  LoginAccount(this.cookieJar, this.accessKey, this.refresh,
+      [Set<AccountType>? type])
+      : type = type ?? {} {
     cookieJar.setBuvid3();
   }
 
-  factory LoginAccount.fromJson(Map<String, dynamic> json) => LoginAccount(
-        BiliCookieJar.fromJson(json['cookies']),
-        json['accessKey'],
-        json['refresh'],
-        (json['type'] as Iterable?)?.map((i) => AccountType.values[i]).toSet(),
-      );
+  LoginAccount.fromJson(Map json) {
+    cookieJar = BiliCookieJar.fromJson(json['cookies'])..setBuvid3();
+    accessKey = json['accessKey'];
+    refresh = json['refresh'];
+    type = (json['type'] as Iterable?)
+            ?.map((i) => AccountType.values[i])
+            .toSet() ??
+        {};
+  }
 
   @override
   int get hashCode => mid.hashCode;
@@ -99,20 +102,22 @@ class AnonymousAccount implements Account {
   @override
   final bool isLogin = false;
   @override
-  final DefaultCookieJar cookieJar = DefaultCookieJar(ignoreExpires: true)
-    ..setBuvid3();
+  late final DefaultCookieJar cookieJar;
   @override
-  final String? accessKey = null;
+  String? accessKey;
   @override
-  final String? refresh = null;
+  String? refresh;
   @override
-  final Set<AccountType> type = {};
+  Set<AccountType> type = {};
   @override
   final int mid = 0;
   @override
-  final String csrf = '';
+  String csrf = '';
   @override
   final Map<String, String> headers = const {};
+
+  @override
+  bool activited = false;
 
   @override
   Future<void> delete() async {
@@ -128,7 +133,9 @@ class AnonymousAccount implements Account {
 
   static final _instance = AnonymousAccount._();
 
-  AnonymousAccount._();
+  AnonymousAccount._() {
+    cookieJar = DefaultCookieJar(ignoreExpires: true)..setBuvid3();
+  }
 
   factory AnonymousAccount() => _instance;
 
@@ -166,7 +173,7 @@ extension BiliCookieJar on DefaultCookieJar {
   void setBuvid3() {
     domainCookies['bilibili.com'] ??= {'/': {}};
     domainCookies['bilibili.com']!['/']!['buvid3'] ??= SerializableCookie(
-        Cookie('buvid3', Utils.genBuvid3())..setBiliDomain());
+        Cookie('buvid3', IdUtils.genBuvid3())..setBiliDomain());
   }
 
   static DefaultCookieJar fromJson(Map json) =>

@@ -40,11 +40,12 @@ class _ZonePageState extends CommonPageState<ZonePage, ZoneController>
       onRefresh: controller.onRefresh,
       child: CustomScrollView(
         controller: controller.scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
             padding: EdgeInsets.only(
               top: StyleString.safeSpace - 5,
-              bottom: MediaQuery.of(context).padding.bottom + 80,
+              bottom: MediaQuery.paddingOf(context).bottom + 80,
             ),
             sliver: Obx(() => _buildBody(controller.loadingState.value)),
           ),
@@ -77,7 +78,9 @@ class _ZonePageState extends CommonPageState<ZonePage, ZoneController>
                   if (item is HotVideoItemModel) {
                     return VideoCardH(
                       videoItem: item,
-                      showPubdate: true,
+                      onRemove: () => controller.loadingState
+                        ..value.data!.removeAt(index)
+                        ..refresh(),
                     );
                   }
                   return PgcRankItem(item: item);

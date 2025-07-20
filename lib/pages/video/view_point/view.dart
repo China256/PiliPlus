@@ -5,7 +5,7 @@ import 'package:PiliPlus/common/widgets/progress_bar/segment_progress_bar.dart';
 import 'package:PiliPlus/pages/common/common_collapse_slide_page.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
-import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/duration_util.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -35,7 +35,6 @@ class _ViewPointsPageState
   @override
   Widget buildPage(ThemeData theme) {
     return Scaffold(
-      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         titleSpacing: 16,
@@ -88,6 +87,10 @@ class _ViewPointsPageState
 
   @override
   Widget buildList(ThemeData theme) {
+    final divider = Divider(
+      height: 1,
+      color: theme.dividerColor.withValues(alpha: 0.1),
+    );
     return ListView.separated(
       controller: ScrollController(),
       physics: const AlwaysScrollableScrollPhysics(),
@@ -148,7 +151,7 @@ class _ViewPointsPageState
             ),
           ),
           subtitle: Text(
-            '${segment.from != null ? Utils.timeFormat(segment.from) : ''} - ${segment.to != null ? Utils.timeFormat(segment.to) : ''}',
+            '${segment.from != null ? DurationUtil.formatDuration(segment.from) : ''} - ${segment.to != null ? DurationUtil.formatDuration(segment.to) : ''}',
             style: TextStyle(
               fontSize: 13,
               color: currentIndex == index
@@ -158,10 +161,7 @@ class _ViewPointsPageState
           ),
         );
       },
-      separatorBuilder: (context, index) => Divider(
-        height: 1,
-        color: theme.dividerColor.withValues(alpha: 0.1),
-      ),
+      separatorBuilder: (context, index) => divider,
     );
   }
 }

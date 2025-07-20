@@ -4,7 +4,7 @@ import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
 import 'package:PiliPlus/http/loading_state.dart';
-import 'package:PiliPlus/models/member/article.dart';
+import 'package:PiliPlus/models_new/fav/fav_note/list.dart';
 import 'package:PiliPlus/pages/fav/note/controller.dart';
 import 'package:PiliPlus/pages/fav/note/widget/item.dart';
 import 'package:PiliPlus/utils/grid.dart';
@@ -36,6 +36,8 @@ class _FavNoteChildPageState extends State<FavNoteChildPage>
           refreshIndicator(
             onRefresh: _favNoteController.onRefresh,
             child: CustomScrollView(
+              controller: _favNoteController.scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverPadding(
                   padding: EdgeInsets.only(
@@ -130,7 +132,7 @@ class _FavNoteChildPageState extends State<FavNoteChildPage>
     );
   }
 
-  Widget _buildBody(LoadingState<List<FavArticleModel>?> loadingState) {
+  Widget _buildBody(LoadingState<List<FavNoteItemModel>?> loadingState) {
     return switch (loadingState) {
       Loading() => SliverGrid(
           gridDelegate: Grid.videoCardHDelegate(context),
@@ -149,10 +151,11 @@ class _FavNoteChildPageState extends State<FavNoteChildPage>
                   if (index == response.length - 1) {
                     _favNoteController.onLoadMore();
                   }
+                  final item = response[index];
                   return FavNoteItem(
-                    item: response[index],
+                    item: item,
                     ctr: _favNoteController,
-                    onSelect: () => _favNoteController.onSelect(index),
+                    onSelect: () => _favNoteController.onSelect(item),
                   );
                 },
                 childCount: response!.length,

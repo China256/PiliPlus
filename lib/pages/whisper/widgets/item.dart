@@ -1,13 +1,14 @@
 import 'dart:convert';
 
 import 'package:PiliPlus/common/widgets/badge.dart';
+import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/pendant_avatar.dart';
 import 'package:PiliPlus/grpc/bilibili/app/im/v1.pb.dart'
     show Session, SessionId, SessionPageType, SessionType, UnreadStyle;
 import 'package:PiliPlus/models/common/badge_type.dart';
 import 'package:PiliPlus/pages/whisper_secondary/view.dart';
+import 'package:PiliPlus/utils/date_util.dart';
 import 'package:PiliPlus/utils/extension.dart';
-import 'package:PiliPlus/utils/utils.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -29,6 +30,13 @@ class WhisperSessionItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resource =
+        item.sessionInfo.avatar.fallbackLayers.layers.first.resource;
+    final avatar = resource.hasResImage()
+        ? resource.resImage.imageSrc.remote.url
+        : resource.hasResAnimation()
+            ? resource.resAnimation.webpSrc.remote.url
+            : resource.resNativeDraw.drawSrc.remote.url;
     Map? vipInfo = item.sessionInfo.hasVipInfo()
         ? jsonDecode(item.sessionInfo.vipInfo)
         : null;
@@ -71,7 +79,12 @@ class WhisperSessionItem extends StatelessWidget {
                       dense: true,
                       onTap: () {
                         Get.back();
-                        onRemove(item.id.privateId.talkerUid.toInt());
+                        showConfirmDialog(
+                          context: context,
+                          title: '确定删除该对话？',
+                          onConfirm: () =>
+                              onRemove(item.id.privateId.talkerUid.toInt()),
+                        );
                       },
                       title: const Text('删除'),
                     ),
@@ -94,8 +107,7 @@ class WhisperSessionItem extends StatelessWidget {
             arguments: {
               'talkerId': item.id.privateId.talkerUid.toInt(),
               'name': item.sessionInfo.sessionName,
-              'face': item.sessionInfo.avatar.fallbackLayers.layers.first
-                  .resource.resImage.imageSrc.remote.url,
+              'face': avatar,
               if (item.sessionInfo.avatar.hasMid())
                 'mid': item.sessionInfo.avatar.mid.toInt(),
             },
@@ -139,17 +151,21 @@ class WhisperSessionItem extends StatelessWidget {
       },
       leading: Builder(
         builder: (context) {
-          Widget buildAvatar() {
-            final pendant = item.sessionInfo.avatar.fallbackLayers.layers
-                .getOrNull(1)
-                ?.resource;
-            final offcial = item.sessionInfo.avatar.fallbackLayers.layers
-                .lastOrNull?.resource.resImage.imageSrc;
-            return PendantAvatar(
+          final pendant = item.sessionInfo.avatar.fallbackLayers.layers
+              .getOrNull(1)
+              ?.resource;
+          final offcial = item.sessionInfo.avatar.fallbackLayers.layers
+              .lastOrNull?.resource.resImage.imageSrc;
+
+          return GestureDetector(
+            onTap: item.sessionInfo.avatar.hasMid()
+                ? () =>
+                    Get.toNamed('/member?mid=${item.sessionInfo.avatar.mid}')
+                : null,
+            child: PendantAvatar(
               size: 42,
               badgeSize: 14,
-              avatar: item.sessionInfo.avatar.fallbackLayers.layers.first
-                  .resource.resImage.imageSrc.remote.url,
+              avatar: avatar,
               garbPendantImage:
                   pendant?.resImage.imageSrc.remote.hasUrl() == true
                       ? pendant!.resImage.imageSrc.remote.url
@@ -162,85 +178,80 @@ class WhisperSessionItem extends StatelessWidget {
                       _ => null,
                     }
                   : null,
-            );
-          }
-
-          return GestureDetector(
-            onTap: item.sessionInfo.avatar.hasMid()
-                ? () => Get.toNamed(
-                      '/member?mid=${item.sessionInfo.avatar.mid}',
-                    )
-                : null,
-            child: item.hasUnread() &&
-                    item.unread.style != UnreadStyle.UNREAD_STYLE_NONE
-                ? Badge(
-                    label: item.unread.style == UnreadStyle.UNREAD_STYLE_NUMBER
-                        ? Text(" ${item.unread.number} ")
-                        : null,
-                    alignment: Alignment.topRight,
-                    child: buildAvatar(),
-                  )
-                : buildAvatar(),
+            ),
           );
         },
       ),
       title: Row(
+        spacing: 5,
         children: [
-          Text(
-            item.sessionInfo.sessionName,
-            style: TextStyle(
-              fontSize: 15,
-              color: vipInfo?['status'] != null &&
-                      vipInfo!['status'] > 0 &&
-                      vipInfo['type'] == 2
-                  ? context.vipColor
-                  : null,
+          Expanded(
+            child: Row(
+              spacing: 5,
+              children: [
+                Flexible(
+                  child: Text(
+                    item.sessionInfo.sessionName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: vipInfo?['status'] != null &&
+                              vipInfo!['status'] > 0 &&
+                              vipInfo['type'] == 2
+                          ? context.vipColor
+                          : null,
+                    ),
+                  ),
+                ),
+                if (item.sessionInfo.userLabel.style.borderedLabel.hasText())
+                  PBadge(
+                    isStack: false,
+                    type: PBadgeType.line_secondary,
+                    size: PBadgeSize.small,
+                    fontSize: 10,
+                    isBold: false,
+                    text: item.sessionInfo.userLabel.style.borderedLabel.text,
+                  ),
+                if (item.sessionInfo.isLive)
+                  Image.asset('assets/images/live/live.gif', height: 15),
+              ],
             ),
           ),
-          if (item.sessionInfo.userLabel.style.borderedLabel.hasText()) ...[
-            const SizedBox(width: 5),
-            PBadge(
-              isStack: false,
-              type: PBadgeType.line_secondary,
-              size: PBadgeSize.small,
-              fontSize: 10,
-              isBold: false,
-              text: item.sessionInfo.userLabel.style.borderedLabel.text,
-            ),
-          ],
-          if (item.sessionInfo.isLive) ...[
-            const SizedBox(width: 5),
-            Image.asset('assets/images/live/live.gif', height: 15),
-          ],
-        ],
-      ),
-      subtitle: Text(
-        item.msgSummary.rawMsg,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.labelMedium!
-            .copyWith(color: theme.colorScheme.outline),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (item.isMuted) ...[
-            Icon(
-              size: 16,
-              Icons.notifications_off,
-              color: theme.colorScheme.outline,
-            ),
-            if (item.hasTimestamp()) const SizedBox(width: 4),
-          ],
           if (item.hasTimestamp())
             Text(
-              Utils.dateFormat((item.timestamp ~/ 1000000).toInt(),
-                  formatType: "day"),
+              DateUtil.dateFormat((item.timestamp ~/ 1000000).toInt()),
               style: TextStyle(
                 fontSize: 12,
                 color: theme.colorScheme.outline,
               ),
             ),
+        ],
+      ),
+      subtitle: Row(
+        children: [
+          Expanded(
+            child: Text(
+              item.msgSummary.rawMsg,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium!
+                  .copyWith(color: theme.colorScheme.outline),
+            ),
+          ),
+          if (item.isMuted)
+            Icon(
+              size: 16,
+              Icons.notifications_off,
+              color: theme.colorScheme.outline,
+            )
+          else if (item.hasUnread() &&
+              item.unread.style != UnreadStyle.UNREAD_STYLE_NONE)
+            Badge(
+              label: item.unread.style == UnreadStyle.UNREAD_STYLE_NUMBER
+                  ? Text(item.unread.number.toString())
+                  : null,
+            )
         ],
       ),
     );

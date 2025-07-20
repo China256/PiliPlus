@@ -6,8 +6,6 @@ import 'package:PiliPlus/pages/danmaku/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/utils/danmaku_utils.dart';
-import 'package:PiliPlus/utils/extension.dart';
-import 'package:PiliPlus/utils/storage.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -34,7 +32,6 @@ class _PlDanmakuState extends State<PlDanmaku> {
 
   late PlDanmakuController _plDanmakuController;
   DanmakuController? _controller;
-  late bool enableShowDanmaku;
   int latestAddedPosition = -1;
   bool? _isFullScreen;
   StreamSubscription? _listenerFS;
@@ -42,13 +39,11 @@ class _PlDanmakuState extends State<PlDanmaku> {
   @override
   void initState() {
     super.initState();
-    enableShowDanmaku = GStorage.setting
-        .get(SettingBoxKey.enableShowDanmaku, defaultValue: true);
     _plDanmakuController = PlDanmakuController(
       widget.cid,
       playerController,
     );
-    if (enableShowDanmaku || playerController.isOpenDanmu.value) {
+    if (playerController.enableShowDanmaku.value) {
       _plDanmakuController.queryDanmaku(
         _plDanmakuController.calcSegment(
           playerController.position.value.inMilliseconds,
@@ -82,7 +77,7 @@ class _PlDanmakuState extends State<PlDanmaku> {
   }
 
   void videoPositionListen(Duration position) {
-    if (!playerController.isOpenDanmu.value) {
+    if (!playerController.enableShowDanmaku.value) {
       return;
     }
 
@@ -90,7 +85,7 @@ class _PlDanmakuState extends State<PlDanmaku> {
       return;
     }
 
-    if (playerController.showDanmaku.not && widget.isPipMode != true) {
+    if (!playerController.showDanmaku && widget.isPipMode != true) {
       return;
     }
 
@@ -131,9 +126,8 @@ class _PlDanmakuState extends State<PlDanmaku> {
                       e.colorful == DmColorfulType.VipGradualColor
                   ? true
                   : null,
-              count: widget.playerController.mergeDanmaku && e.hasAttr()
-                  ? e.attr
-                  : null,
+              count: e.hasCount() ? e.count : null,
+              selfSend: e.isSelf,
             ),
           );
         }
@@ -151,10 +145,10 @@ class _PlDanmakuState extends State<PlDanmaku> {
     super.dispose();
   }
 
-  double _getFontSize(isFullScreen) =>
-      isFullScreen == false || widget.isPipMode == true
-          ? 15 * playerController.fontSize
-          : 15 * playerController.fontSizeFS;
+  double _getFontSize(bool isFullScreen) =>
+      !isFullScreen || widget.isPipMode == true
+          ? 15 * playerController.danmakuFontScale
+          : 15 * playerController.danmakuFontScaleFS;
 
   @override
   Widget build(BuildContext context) {
@@ -162,7 +156,7 @@ class _PlDanmakuState extends State<PlDanmaku> {
       // double initDuration = box.maxWidth / 12;
       return Obx(
         () => AnimatedOpacity(
-          opacity: playerController.isOpenDanmu.value ? 1 : 0,
+          opacity: playerController.enableShowDanmaku.value ? 1 : 0,
           duration: const Duration(milliseconds: 100),
           child: DanmakuScreen(
             createdController: (DanmakuController e) {
@@ -172,7 +166,7 @@ class _PlDanmakuState extends State<PlDanmaku> {
               fontSize: _getFontSize(playerController.isFullScreen.value),
               fontWeight: playerController.fontWeight,
               area: playerController.showArea,
-              opacity: playerController.opacity,
+              opacity: playerController.danmakuOpacity,
               hideTop: playerController.blockTypes.contains(5),
               hideScroll: playerController.blockTypes.contains(2),
               hideBottom: playerController.blockTypes.contains(4),

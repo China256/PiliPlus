@@ -4,6 +4,7 @@ import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
 import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/models_new/fav/fav_article/item.dart';
 import 'package:PiliPlus/pages/fav/article/controller.dart';
 import 'package:PiliPlus/pages/fav/article/widget/item.dart';
 import 'package:PiliPlus/utils/grid.dart';
@@ -31,6 +32,8 @@ class _FavArticlePageState extends State<FavArticlePage>
     return refreshIndicator(
       onRefresh: _favArticleController.onRefresh,
       child: CustomScrollView(
+        controller: _favArticleController.scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
             padding: EdgeInsets.only(
@@ -45,7 +48,7 @@ class _FavArticlePageState extends State<FavArticlePage>
     );
   }
 
-  Widget _buildBody(LoadingState<List<dynamic>?> loadingState) {
+  Widget _buildBody(LoadingState<List<FavArticleItemModel>?> loadingState) {
     return switch (loadingState) {
       Loading() => SliverGrid(
           gridDelegate: Grid.videoCardHDelegate(context),
@@ -64,17 +67,14 @@ class _FavArticlePageState extends State<FavArticlePage>
                   if (index == response.length - 1) {
                     _favArticleController.onLoadMore();
                   }
+                  final item = response[index];
                   return FavArticleItem(
-                    item: response[index],
+                    item: item,
                     onDelete: () => showConfirmDialog(
                       context: context,
                       title: '确定取消收藏？',
-                      onConfirm: () {
-                        _favArticleController.onRemove(
-                          index,
-                          response[index]['opus_id'],
-                        );
-                      },
+                      onConfirm: () =>
+                          _favArticleController.onRemove(index, item.opusId),
                     ),
                   );
                 },

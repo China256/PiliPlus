@@ -1,13 +1,13 @@
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
-import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/later_view_type.dart';
-import 'package:PiliPlus/models/model_hot_video_item.dart';
+import 'package:PiliPlus/models_new/later/data.dart';
+import 'package:PiliPlus/models_new/later/list.dart';
 import 'package:PiliPlus/pages/history/view.dart' show AppBarWidget;
 import 'package:PiliPlus/pages/later/base_controller.dart';
 import 'package:PiliPlus/pages/later/controller.dart';
+import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
-import 'package:PiliPlus/utils/storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -59,7 +59,7 @@ class _LaterPageState extends State<LaterPage>
   Widget build(BuildContext context) {
     return Obx(
       () => PopScope(
-        canPop: _baseCtr.enableMultiSelect.value.not,
+        canPop: !_baseCtr.enableMultiSelect.value,
         onPopInvokedWithResult: (didPop, result) {
           if (_baseCtr.enableMultiSelect.value) {
             currCtr().handleSelect();
@@ -69,7 +69,7 @@ class _LaterPageState extends State<LaterPage>
           resizeToAvoidBottomInset: false,
           appBar: _buildAppbar,
           floatingActionButton: Obx(
-            () => currCtr().loadingState.value is Success
+            () => currCtr().loadingState.value.isSuccess
                 ? FloatingActionButton.extended(
                     onPressed: currCtr().toViewPlayAll,
                     label: const Text('播放全部'),
@@ -83,16 +83,16 @@ class _LaterPageState extends State<LaterPage>
             child: Column(
               children: [
                 TabBar(
-                  isScrollable: true,
+                  // isScrollable: true,
+                  // tabAlignment: TabAlignment.start,
                   controller: _tabController,
-                  tabAlignment: TabAlignment.start,
                   tabs: LaterViewType.values.map((item) {
                     final count = _baseCtr.counts[item];
                     return Tab(
                         text: '${item.title}${count != -1 ? '($count)' : ''}');
                   }).toList(),
                   onTap: (_) {
-                    if (_tabController.indexIsChanging.not) {
+                    if (!_tabController.indexIsChanging) {
                       currCtr().scrollController.animToTop();
                     } else {
                       if (_baseCtr.enableMultiSelect.value) {
@@ -147,7 +147,7 @@ class _LaterPageState extends State<LaterPage>
           ),
           Material(
             clipBehavior: Clip.hardEdge,
-            color: Colors.transparent,
+            type: MaterialType.transparency,
             borderRadius: const BorderRadius.all(Radius.circular(20)),
             child: Builder(
               key: sortKey,
@@ -198,7 +198,7 @@ class _LaterPageState extends State<LaterPage>
           ),
           Material(
             clipBehavior: Clip.hardEdge,
-            color: Colors.transparent,
+            type: MaterialType.transparency,
             borderRadius: const BorderRadius.all(Radius.circular(20)),
             child: PopupMenuButton(
               tooltip: '清空',
@@ -267,12 +267,12 @@ class _LaterPageState extends State<LaterPage>
             ),
             onPressed: () {
               final ctr = currCtr();
-              RequestUtils.onCopyOrMove<Map, HotVideoItemModel>(
+              RequestUtils.onCopyOrMove<LaterData, LaterItemModel>(
                 context: context,
                 isCopy: true,
                 ctr: ctr,
                 mediaId: null,
-                mid: ctr.mid,
+                mid: ctr.accountService.mid,
               );
             },
             child: Text(
@@ -288,12 +288,12 @@ class _LaterPageState extends State<LaterPage>
             ),
             onPressed: () {
               final ctr = currCtr();
-              RequestUtils.onCopyOrMove<Map, HotVideoItemModel>(
+              RequestUtils.onCopyOrMove<LaterData, LaterItemModel>(
                 context: context,
                 isCopy: false,
                 ctr: ctr,
                 mediaId: null,
-                mid: ctr.mid,
+                mid: ctr.accountService.mid,
               );
             },
             child: Text(

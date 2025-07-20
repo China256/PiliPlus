@@ -8,16 +8,16 @@ import 'package:PiliPlus/grpc/im.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/msg.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
+import 'package:PiliPlus/services/account_service.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
-import 'package:PiliPlus/utils/storage.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 
 class WhisperDetailController extends CommonListController<RspSessionMsg, Msg> {
-  late final ownerMid = Accounts.main.mid;
+  AccountService accountService = Get.find<AccountService>();
 
   final int talkerId = Get.arguments['talkerId'];
   final String name = Get.arguments['name'];
@@ -43,8 +43,6 @@ class WhisperDetailController extends CommonListController<RspSessionMsg, Msg> {
       if (msgs.length == 1 &&
           msgs.last.msgType == 18 &&
           msgs.last.msgSource == 18) {
-        // debugPrint(messageList.last);
-        // debugPrint(messageList.last.content);
         //{content: [{"text":"对方主动回复或关注你前，最多发送1条消息","color_day":"#9499A0","color_nig":"#9499A0"}]}
       } else {
         ackSessionMsg(msgs.last.msgSeqno.toInt());
@@ -67,23 +65,24 @@ class WhisperDetailController extends CommonListController<RspSessionMsg, Msg> {
   }
 
   Future<void> sendMsg({
-    required String message,
+    String? message,
     Map? picMsg,
     required VoidCallback onClearText,
     int? msgType,
     int? index,
   }) async {
+    assert((message != null) ^ (picMsg != null));
     feedBack();
     SmartDialog.dismiss();
-    if (ownerMid == 0) {
+    if (!accountService.isLogin.value) {
       SmartDialog.showToast('请先登录');
       return;
     }
     var result = await ImGrpc.sendMsg(
-      senderUid: ownerMid,
+      senderUid: accountService.mid,
       receiverId: mid!,
       content:
-          msgType == 5 ? message : jsonEncode(picMsg ?? {"content": message}),
+          msgType == 5 ? message! : jsonEncode(picMsg ?? {"content": message!}),
       msgType: MsgType.values[msgType ?? (picMsg != null ? 2 : 1)],
     );
     SmartDialog.dismiss();

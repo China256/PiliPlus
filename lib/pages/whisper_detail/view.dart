@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
+import 'package:PiliPlus/common/widgets/text_field/text_field.dart';
 import 'package:PiliPlus/grpc/bilibili/im/type.pb.dart' show Msg;
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/msg.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/models/common/publish_panel_type.dart';
-import 'package:PiliPlus/pages/common/common_publish_page.dart';
+import 'package:PiliPlus/models_new/upload_bfs/data.dart';
+import 'package:PiliPlus/pages/common/publish/common_rich_text_pub_page.dart';
 import 'package:PiliPlus/pages/emote/view.dart';
 import 'package:PiliPlus/pages/whisper_detail/controller.dart';
 import 'package:PiliPlus/pages/whisper_detail/widget/chat_item.dart';
@@ -16,13 +18,13 @@ import 'package:PiliPlus/pages/whisper_link_setting/view.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/utils.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide TextField;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 
-class WhisperDetailPage extends CommonPublishPage {
+class WhisperDetailPage extends CommonRichTextPubPage {
   const WhisperDetailPage({
     super.key,
     super.autofocus = false,
@@ -33,7 +35,7 @@ class WhisperDetailPage extends CommonPublishPage {
 }
 
 class _WhisperDetailPageState
-    extends CommonPublishPageState<WhisperDetailPage> {
+    extends CommonRichTextPubPageState<WhisperDetailPage> {
   final _whisperDetailController = Get.put(
     WhisperDetailController(),
     tag: Utils.makeHeroTag(Get.parameters['talkerId']),
@@ -68,12 +70,7 @@ class _WhisperDetailPageState
           onTap: () {
             if (_whisperDetailController.mid != null) {
               feedBack();
-              Get.toNamed(
-                '/member?mid=${_whisperDetailController.mid}',
-                arguments: {
-                  'face': _whisperDetailController.face,
-                },
-              );
+              Get.toNamed('/member?mid=${_whisperDetailController.mid}');
             }
           },
           child: Row(
@@ -130,7 +127,7 @@ class _WhisperDetailPageState
             ),
             if (_whisperDetailController.mid != null) ...[
               _buildInputView(theme),
-              buildPanelContainer(theme.colorScheme.onInverseSurface),
+              buildPanelContainer(theme, theme.colorScheme.onInverseSurface),
             ] else
               SizedBox(height: MediaQuery.paddingOf(context).bottom),
           ],
@@ -147,7 +144,7 @@ class _WhisperDetailPageState
               shrinkWrap: true,
               reverse: true,
               itemCount: response!.length,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               physics: const AlwaysScrollableScrollPhysics(
                 parent: ClampingScrollPhysics(),
               ),
@@ -160,14 +157,13 @@ class _WhisperDetailPageState
                 return ChatItem(
                   item: item,
                   eInfos: _whisperDetailController.eInfos,
-                  onLongPress:
-                      item.senderUid == _whisperDetailController.ownerMid
-                          ? () => onLongPress(index, item)
-                          : null,
+                  onLongPress: item.senderUid.toInt() ==
+                          _whisperDetailController.accountService.mid
+                      ? () => onLongPress(index, item)
+                      : null,
                 );
               },
-              separatorBuilder: (BuildContext context, int index) =>
-                  const SizedBox(height: 12),
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
             )
           : scrollErrorWidget(
               onReload: _whisperDetailController.onReload,
@@ -212,7 +208,7 @@ class _WhisperDetailPageState
     );
   }
 
-  Widget _buildInputView(theme) {
+  Widget _buildInputView(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
@@ -227,7 +223,7 @@ class _WhisperDetailPageState
         children: [
           IconButton(
             onPressed: () => updatePanelType(
-              PanelType.emoji == currentPanelType
+              panelType.value == PanelType.emoji
                   ? PanelType.keyboard
                   : PanelType.emoji,
             ),
@@ -243,20 +239,14 @@ class _WhisperDetailPageState
                 }
               },
               child: Obx(
-                () => TextField(
+                () => RichTextField(
+                  key: key,
                   readOnly: readOnly.value,
                   focusNode: focusNode,
                   controller: editController,
                   minLines: 1,
                   maxLines: 4,
-                  onChanged: (value) {
-                    bool isNotEmpty = value.trim().isNotEmpty;
-                    if (isNotEmpty && !enablePublish.value) {
-                      enablePublish.value = true;
-                    } else if (!isNotEmpty && enablePublish.value) {
-                      enablePublish.value = false;
-                    }
-                  },
+                  onChanged: onChanged,
                   textInputAction: TextInputAction.newline,
                   decoration: InputDecoration(
                     filled: true,
@@ -269,6 +259,7 @@ class _WhisperDetailPageState
                     ),
                     contentPadding: const EdgeInsets.all(10),
                   ),
+                  // inputFormatters: [LengthLimitingTextInputFormatter(500)],
                 ),
               ),
             ),
@@ -279,7 +270,7 @@ class _WhisperDetailPageState
                 onPressed: () async {
                   if (enablePublish.value) {
                     _whisperDetailController.sendMsg(
-                      message: editController.text,
+                      message: editController.rawText,
                       onClearText: editController.clear,
                     );
                   } else {
@@ -299,18 +290,18 @@ class _WhisperDetailPageState
                                   ?.split('/')
                                   .getOrNull(1) ??
                               'jpg';
+                          UploadBfsResData data = result['data'];
                           Map picMsg = {
-                            'url': result['data']['image_url'],
-                            'height': result['data']['image_height'],
-                            'width': result['data']['image_width'],
+                            'url': data.imageUrl,
+                            'height': data.imageHeight,
+                            'width': data.imageWidth,
                             'imageType': mimeType,
                             'original': 1,
-                            'size': result['data']['img_size'] / 1024,
+                            'size': data.imgSize,
                           };
                           SmartDialog.showLoading(msg: '正在发送');
                           await _whisperDetailController.sendMsg(
                             picMsg: picMsg,
-                            message: editController.text,
                             onClearText: editController.clear,
                           );
                         } else {
@@ -340,7 +331,15 @@ class _WhisperDetailPageState
   Widget? get customPanel => EmotePanel(onChoose: onChooseEmote);
 
   @override
-  Future<void> onCustomPublish({required String message, List? pictures}) {
+  Future<void> onCustomPublish({List? pictures}) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<void> onMention([bool fromClick = false]) {
+    return Future.value();
+  }
+
+  @override
+  void onSave() {}
 }

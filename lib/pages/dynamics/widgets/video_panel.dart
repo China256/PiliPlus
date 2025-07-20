@@ -4,16 +4,13 @@ import 'package:PiliPlus/common/widgets/badge.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/models/common/badge_type.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
-import 'package:PiliPlus/pages/dynamics/widgets/content_panel.dart';
-import 'package:PiliPlus/pages/dynamics/widgets/rich_node_panel.dart';
-import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/num_util.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
 Widget videoSeasonWidget(
   ThemeData theme,
   bool isSave,
-  String? source,
+  bool isDetail,
   DynamicItemModel item,
   BuildContext context,
   String type,
@@ -32,9 +29,7 @@ Widget videoSeasonWidget(
               const SizedBox(width: 5),
               Text(
                 item.modules.moduleDynamic!.major!.none!.tips!,
-                style: TextStyle(
-                  color: theme.colorScheme.outline,
-                ),
+                style: TextStyle(color: theme.colorScheme.outline),
               ),
             ],
           )
@@ -60,8 +55,6 @@ Widget videoSeasonWidget(
     return const SizedBox.shrink();
   }
 
-  TextSpan? richNodes = richNode(theme, item, context);
-
   Widget buildCover() {
     return LayoutBuilder(
       builder: (context, box) {
@@ -73,17 +66,19 @@ Widget videoSeasonWidget(
               width: width,
               height: width / StyleString.aspectRatio,
               src: itemContent.cover,
+              quality: 40,
             ),
-            if (itemContent.badge?['text'] != null)
+            if (itemContent.badge?.text != null)
               PBadge(
-                text: itemContent.badge!['text'],
+                text: itemContent.badge!.text,
                 top: 8.0,
                 right: 10.0,
                 bottom: null,
                 left: null,
-                type: itemContent.badge!['text'] == '充电专属'
-                    ? PBadgeType.error
-                    : PBadgeType.primary,
+                type: switch (itemContent.badge!.text) {
+                  '充电专属' => PBadgeType.error,
+                  _ => PBadgeType.primary,
+                },
               ),
             Positioned(
               left: 0,
@@ -93,7 +88,6 @@ Widget videoSeasonWidget(
                 height: 70,
                 alignment: Alignment.bottomLeft,
                 padding: const EdgeInsets.fromLTRB(10, 0, 8, 8),
-                clipBehavior: Clip.hardEdge,
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
@@ -117,16 +111,18 @@ Widget videoSeasonWidget(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       if (itemContent.durationText != null) ...[
-                        Text(
-                          itemContent.durationText!,
-                          semanticsLabel:
-                              '时长${Utils.durationReadFormat(itemContent.durationText!)}',
+                        DecoratedBox(
+                          decoration: const BoxDecoration(
+                            color: Colors.black45,
+                            borderRadius: BorderRadius.all(Radius.circular(4)),
+                          ),
+                          child: Text(' ${itemContent.durationText} '),
                         ),
                         const SizedBox(width: 6),
                       ],
-                      Text('${itemContent.stat?.play}次围观'),
+                      Text('${NumUtil.numFormat(itemContent.stat?.play)}次围观'),
                       const SizedBox(width: 6),
-                      Text('${itemContent.stat?.danmu}条弹幕'),
+                      Text('${NumUtil.numFormat(itemContent.stat?.danmu)}条弹幕'),
                       const Spacer(),
                       Image.asset(
                         'assets/images/play.png',
@@ -146,48 +142,16 @@ Widget videoSeasonWidget(
 
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisAlignment: MainAxisAlignment.start,
     children: [
-      if (floor == 2) ...[
-        Row(
-          children: [
-            GestureDetector(
-              onTap: () => Get.toNamed(
-                '/member?mid=${item.modules.moduleAuthor!.mid}',
-                arguments: {'face': item.modules.moduleAuthor!.face},
-              ),
-              child: Text(
-                '@${item.modules.moduleAuthor!.name}',
-                style: TextStyle(color: theme.colorScheme.primary),
-              ),
-            ),
-            const SizedBox(width: 6),
-            if (item.modules.moduleAuthor?.pubTs != null)
-              Text(
-                Utils.dateFormat(item.modules.moduleAuthor!.pubTs),
-                style: TextStyle(
-                  color: theme.colorScheme.outline,
-                  fontSize: theme.textTheme.labelSmall!.fontSize,
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        content(theme, isSave, context, item, source, null, floor: 2),
-        if (itemContent.desc != null && richNodes != null) ...[
-          Text.rich(richNodes),
-          const SizedBox(height: 6),
-        ],
-      ],
       if (itemContent.cover != null)
-        if (item.isForwarded == true)
-          buildCover()
-        else
+        if (floor == 1)
           Padding(
             padding:
                 const EdgeInsets.symmetric(horizontal: StyleString.safeSpace),
             child: buildCover(),
-          ),
+          )
+        else
+          buildCover(),
       const SizedBox(height: 6),
       if (itemContent.title != null)
         Padding(
@@ -196,9 +160,9 @@ Widget videoSeasonWidget(
               : EdgeInsets.zero,
           child: Text(
             itemContent.title!,
-            maxLines: source == 'detail' ? null : 1,
+            maxLines: isDetail ? null : 1,
             style: const TextStyle(fontWeight: FontWeight.bold),
-            overflow: source == 'detail' ? null : TextOverflow.ellipsis,
+            overflow: isDetail ? null : TextOverflow.ellipsis,
           ),
         ),
     ],

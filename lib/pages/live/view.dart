@@ -8,8 +8,8 @@ import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/self_sized_horizontal_list.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
-import 'package:PiliPlus/models/live/live_feed_index/card_data_list_item.dart';
-import 'package:PiliPlus/models/live/live_feed_index/card_list.dart';
+import 'package:PiliPlus/models_new/live/live_feed_index/card_data_list_item.dart';
+import 'package:PiliPlus/models_new/live/live_feed_index/card_list.dart';
 import 'package:PiliPlus/pages/common/common_page.dart';
 import 'package:PiliPlus/pages/live/controller.dart';
 import 'package:PiliPlus/pages/live/widgets/live_item_app.dart';
@@ -41,11 +41,8 @@ class _LivePageState extends CommonPageState<LivePage, LiveController>
     final ThemeData theme = Theme.of(context);
     return Container(
       clipBehavior: Clip.hardEdge,
-      margin: const EdgeInsets.only(
-          left: StyleString.safeSpace, right: StyleString.safeSpace),
-      decoration: const BoxDecoration(
-        borderRadius: StyleString.mdRadius,
-      ),
+      margin: const EdgeInsets.symmetric(horizontal: StyleString.safeSpace),
+      decoration: const BoxDecoration(borderRadius: StyleString.mdRadius),
       child: refreshIndicator(
         onRefresh: controller.onRefresh,
         child: CustomScrollView(
@@ -275,58 +272,54 @@ class _LivePageState extends CommonPageState<LivePage, LiveController>
   }
 
   Widget _buildFollowBody(ThemeData theme, List<CardLiveItem> followList) {
-    return MediaQuery.removePadding(
-      context: context,
-      removeLeft: context.orientation == Orientation.landscape,
-      child: SelfSizedHorizontalList(
-        gapSize: 5,
-        childBuilder: (index) {
-          final item = followList[index];
-          return SizedBox(
-            width: 65,
-            child: GestureDetector(
-              onTap: () => Get.toNamed('/liveRoom?roomid=${item.roomid}'),
-              onLongPress: () {
-                Feedback.forLongPress(context);
-                Get.toNamed('/member?mid=${item.uid}');
-              },
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 8),
-                  Container(
-                    margin: const EdgeInsets.all(2),
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        width: 1.5,
-                        color: theme.colorScheme.primary,
-                        strokeAlign: BorderSide.strokeAlignOutside,
-                      ),
-                      shape: BoxShape.circle,
+    return SelfSizedHorizontalList(
+      gapSize: 5,
+      childBuilder: (index) {
+        final item = followList[index];
+        return SizedBox(
+          width: 65,
+          child: GestureDetector(
+            onTap: () => Get.toNamed('/liveRoom?roomid=${item.roomid}'),
+            onLongPress: () {
+              Feedback.forLongPress(context);
+              Get.toNamed('/member?mid=${item.uid}');
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  margin: const EdgeInsets.all(2),
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      width: 1.5,
+                      color: theme.colorScheme.primary,
+                      strokeAlign: BorderSide.strokeAlignOutside,
                     ),
-                    child: NetworkImgLayer(
-                      type: ImageType.avatar,
-                      width: 45,
-                      height: 45,
-                      src: item.face,
-                    ),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.uname!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12),
-                    textAlign: TextAlign.center,
+                  child: NetworkImgLayer(
+                    type: ImageType.avatar,
+                    width: 45,
+                    height: 45,
+                    src: item.face,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.uname!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-          );
-        },
-        itemCount: followList.length,
-      ),
+          ),
+        );
+      },
+      itemCount: followList.length,
     );
   }
 }

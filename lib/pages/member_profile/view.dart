@@ -4,7 +4,15 @@ import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/member/profile_type.dart';
+import 'package:PiliPlus/models/user/info.dart';
+import 'package:PiliPlus/models_new/account_myinfo/data.dart';
+import 'package:PiliPlus/pages/mine/controller.dart';
+import 'package:PiliPlus/services/account_service.dart';
+import 'package:PiliPlus/utils/accounts.dart';
+import 'package:PiliPlus/utils/app_sign.dart';
+import 'package:PiliPlus/utils/date_util.dart';
 import 'package:PiliPlus/utils/extension.dart';
+import 'package:PiliPlus/utils/image_util.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -12,12 +20,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart' hide FormData, MultipartFile;
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:mime/mime.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -28,9 +35,11 @@ class EditProfilePage extends StatefulWidget {
 }
 
 class _EditProfilePageState extends State<EditProfilePage> {
-  LoadingState _loadingState = LoadingState.loading();
+  LoadingState<AccountMyInfoData> _loadingState =
+      LoadingState<AccountMyInfoData>.loading();
   late final _textController = TextEditingController();
   late final _imagePicker = ImagePicker();
+  AccountService accountService = Get.find<AccountService>();
 
   @override
   void initState() {
@@ -55,9 +64,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _getInfo() async {
     Map<String, String> data = {
-      'build': '1462100',
+      'build': '2001100',
       'c_locale': 'zh_CN',
-      'channel': 'yingyongbao',
+      'channel': 'master',
       'mobi_app': 'android_hd',
       'platform': 'android',
       's_locale': 'zh_CN',
@@ -66,18 +75,38 @@ class _EditProfilePageState extends State<EditProfilePage> {
     Request()
         .get('${HttpString.appBaseUrl}/x/v2/account/myinfo',
             queryParameters: data)
-        .then((data) {
-      setState(() {
-        if (data.data['code'] == 0) {
-          _loadingState = Success(data.data['data']);
-        } else {
-          _loadingState = Error(data.data['message']);
-        }
-      });
+        .then((res) {
+      if (mounted) {
+        setState(() {
+          if (res.data['code'] == 0) {
+            AccountMyInfoData data =
+                AccountMyInfoData.fromJson(res.data['data']);
+            _loadingState = Success(data);
+            accountService
+              ..name.value = data.name!
+              ..face.value = data.face!;
+            try {
+              UserInfoData userInfo = GStorage.userInfo.get('userInfoCache')
+                ..uname = data.name
+                ..face = data.face;
+              GStorage.userInfo.put('userInfoCache', userInfo);
+            } catch (_) {}
+            try {
+              Get.find<MineController>().userInfo
+                ..value.uname = data.name
+                ..value.face = data.face
+                ..refresh();
+            } catch (_) {}
+          } else {
+            _loadingState = Error(res.data['message']);
+          }
+        });
+      }
     });
   }
 
-  Widget _buildBody(ThemeData theme, LoadingState loadingState) {
+  Widget _buildBody(
+      ThemeData theme, LoadingState<AccountMyInfoData> loadingState) {
     late final divider = Divider(
       height: 1,
       color: theme.dividerColor.withValues(alpha: 0.1),
@@ -102,7 +131,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 padding: const EdgeInsets.symmetric(vertical: 5),
                 child: ClipOval(
                   child: CachedNetworkImage(
-                    imageUrl: Utils.thumbnailImgUrl(response['face']),
+                    width: 55,
+                    height: 55,
+                    imageUrl: ImageUtil.thumbnailUrl(response.face),
                   ),
                 ),
               ),
@@ -115,15 +146,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
             _item(
               theme: theme,
               title: '昵称',
-              text: response['name'],
+              text: response.name,
               onTap: () {
-                if (response['coins'] < 6) {
+                if (response.coins! < 6) {
                   SmartDialog.showToast('硬币不足');
                 } else {
                   _editDialog(
                     type: ProfileType.uname,
                     title: '昵称',
-                    text: response['name'],
+                    text: response.name!,
                   );
                 }
               },
@@ -132,27 +163,27 @@ class _EditProfilePageState extends State<EditProfilePage> {
             _item(
               theme: theme,
               title: '性别',
-              text: _sex(response['sex']),
+              text: _sex(response.sex!),
               onTap: () => showDialog(
                 context: context,
-                builder: (context_) => _sexDialog(response['sex']),
+                builder: (context_) => _sexDialog(response.sex!),
               ),
             ),
             divider,
             _item(
               theme: theme,
               title: '出生年月',
-              text: response['birthday'],
+              text: response.birthday,
               onTap: () => showDatePicker(
                 context: context,
-                initialDate: DateTime.parse(response['birthday']),
-                firstDate: DateTime(1900, 1, 1),
+                initialDate: DateTime.parse(response.birthday!),
+                firstDate: DateTime(0001, 1, 1),
                 lastDate: DateTime.now(),
-              ).then((date) {
-                if (date != null) {
+              ).then((res) {
+                if (res != null) {
                   _update(
                     type: ProfileType.birthday,
-                    datum: DateFormat('yyyy-MM-dd').format(date),
+                    datum: DateUtil.longFormat.format(res),
                   );
                 }
               }),
@@ -161,11 +192,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
             _item(
               theme: theme,
               title: '个性签名',
-              text: response['sign'].isEmpty ? '无' : response['sign'],
+              text: response.sign,
               onTap: () => _editDialog(
                 type: ProfileType.sign,
                 title: '个性签名',
-                text: response['sign'],
+                text: response.sign ?? '',
               ),
             ),
             divider1,
@@ -180,8 +211,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
               theme: theme,
               title: 'UID',
               needIcon: false,
-              text: response['mid'].toString(),
-              onTap: () => Utils.copyText(response['mid'].toString()),
+              text: response.mid.toString(),
+              onTap: () => Utils.copyText(response.mid.toString()),
             ),
             divider1,
             _item(
@@ -244,6 +275,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     required String text,
   }) {
     _textController.text = text;
+    final lines = type == ProfileType.uname ? 1 : 4;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -252,8 +284,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
           title: Text('修改$title'),
           content: TextField(
             controller: _textController,
-            minLines: type == ProfileType.uname ? 1 : 4,
-            maxLines: type == ProfileType.uname ? 1 : 4,
+            minLines: lines,
+            maxLines: lines,
             autofocus: true,
             style: const TextStyle(fontSize: 14),
             textInputAction:
@@ -307,9 +339,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
     Map<String, String> data = {
       'access_key': accessKey!,
-      'build': '1462100',
+      'build': '2001100',
       'c_locale': 'zh_CN',
-      'channel': 'yingyongbao',
+      'channel': 'master',
       'mobi_app': 'android_hd',
       'platform': 'android',
       's_locale': 'zh_CN',
@@ -324,7 +356,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       else if (type == ProfileType.sex)
         'sex': datum.toString(),
     };
-    Utils.appSign(data);
+    AppSign.appSign(data);
     Request()
         .post(
       '/x/member/app/${type.name}/update',
@@ -333,25 +365,40 @@ class _EditProfilePageState extends State<EditProfilePage> {
         contentType: Headers.formUrlEncodedContentType,
       ),
     )
-        .then((data) {
-      if (data.data['code'] == 0) {
+        .then((res) {
+      if (res.data['code'] == 0) {
+        AccountMyInfoData data = _loadingState.data;
         if (type == ProfileType.uname) {
-          (_loadingState as Success).response['name'] = _textController.text;
-          (_loadingState as Success).response['coins'] -= 6;
+          data
+            ..name = _textController.text
+            ..coins = data.coins! - 6;
+          accountService.name.value = _textController.text;
+          try {
+            UserInfoData userInfo = GStorage.userInfo.get('userInfoCache')
+              ..uname = _textController.text;
+            GStorage.userInfo.put('userInfoCache', userInfo);
+          } catch (_) {}
+          try {
+            Get.find<MineController>().userInfo
+              ..value.uname = _textController.text
+              ..refresh();
+          } catch (_) {}
         } else if (type == ProfileType.sign) {
-          (_loadingState as Success).response['sign'] = _textController.text;
+          data.sign = _textController.text;
         } else if (type == ProfileType.birthday) {
-          (_loadingState as Success).response['birthday'] = datum;
+          data.birthday = datum;
         } else if (type == ProfileType.sex) {
-          (_loadingState as Success).response['sex'] = datum;
+          data.sex = datum;
         }
         SmartDialog.showToast('修改成功');
-        setState(() {});
+        if (mounted) {
+          setState(() {});
+        }
         if (type == ProfileType.uname || type == ProfileType.sign) {
           Get.back();
         }
       } else {
-        SmartDialog.showToast(data.data['message']);
+        SmartDialog.showToast(res.data['message']);
       }
     });
   }
@@ -383,18 +430,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
           fontWeight: FontWeight.normal,
         ),
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
           if (text != null)
-            Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.normal,
-                color: theme.colorScheme.outline,
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: theme.colorScheme.outline,
+                ),
               ),
             )
           else if (widget != null)
@@ -404,6 +453,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
               Icons.keyboard_arrow_right,
               color: theme.colorScheme.outline,
             )
+          else
+            const SizedBox(width: 24)
         ],
       ),
     );
@@ -462,13 +513,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
               'face': await MultipartFile.fromFile(croppedFile.path),
             }),
           )
-              .then((data) {
-            if (data.data['code'] == 0) {
-              (_loadingState as Success).response['face'] = data.data['data'];
+              .then((res) {
+            if (res.data['code'] == 0) {
               SmartDialog.showToast('修改成功');
-              setState(() {});
+              Future.delayed(const Duration(milliseconds: 500))
+                  .whenComplete(_getInfo);
             } else {
-              SmartDialog.showToast(data.data['message']);
+              SmartDialog.showToast(res.data['message']);
             }
           });
         }

@@ -3,12 +3,11 @@ import 'package:PiliPlus/common/skeleton/video_card_h.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
-import 'package:PiliPlus/common/widgets/video_card/video_card_h.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/later_view_type.dart';
-import 'package:PiliPlus/models/model_hot_video_item.dart';
+import 'package:PiliPlus/models_new/later/list.dart';
 import 'package:PiliPlus/pages/later/controller.dart';
-import 'package:PiliPlus/utils/extension.dart';
+import 'package:PiliPlus/pages/later/widgets/video_card_h_later.dart';
 import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -46,7 +45,7 @@ class _LaterViewChildPageState extends State<LaterViewChildPage>
           SliverPadding(
             padding: EdgeInsets.only(
               top: 7,
-              bottom: MediaQuery.of(context).padding.bottom + 85,
+              bottom: MediaQuery.paddingOf(context).bottom + 85,
             ),
             sliver: Obx(
               () => _buildBody(_laterController.loadingState.value),
@@ -57,7 +56,7 @@ class _LaterViewChildPageState extends State<LaterViewChildPage>
     );
   }
 
-  Widget _buildBody(LoadingState<List<HotVideoItemModel>?> loadingState) {
+  Widget _buildBody(LoadingState<List<LaterItemModel>?> loadingState) {
     final theme = Theme.of(context);
     return switch (loadingState) {
       Loading() => SliverGrid(
@@ -81,9 +80,8 @@ class _LaterViewChildPageState extends State<LaterViewChildPage>
                   return Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      VideoCardH(
+                      VideoCardHLater(
                         videoItem: videoItem,
-                        source: 'later',
                         onViewLater: (cid) {
                           PageUtils.toVideoPage(
                             'bvid=${videoItem.bvid}&cid=$cid',
@@ -95,22 +93,21 @@ class _LaterViewChildPageState extends State<LaterViewChildPage>
                               'count': _laterController
                                   .baseCtr.counts[LaterViewType.all],
                               'favTitle': '稍后再看',
-                              'mediaId': _laterController.mid,
+                              'mediaId': _laterController.accountService.mid,
                               'desc': false,
                               'isContinuePlaying': index != 0,
                             },
                           );
                         },
-                        onTap:
-                            _laterController.baseCtr.enableMultiSelect.value.not
-                                ? null
-                                : () => _laterController.onSelect(index),
+                        onTap: !_laterController.baseCtr.enableMultiSelect.value
+                            ? null
+                            : () => _laterController.onSelect(videoItem),
                         onLongPress: () {
-                          if (_laterController
-                              .baseCtr.enableMultiSelect.value.not) {
+                          if (!_laterController
+                              .baseCtr.enableMultiSelect.value) {
                             _laterController.baseCtr.enableMultiSelect.value =
                                 true;
-                            _laterController.onSelect(index);
+                            _laterController.onSelect(videoItem);
                           }
                         },
                       ),

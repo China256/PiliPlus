@@ -77,6 +77,15 @@ class _LiveSearchPageState extends State<LiveSearchPage> {
                       ),
                     ),
                   ],
+                  onTap: (index) {
+                    if (!_controller.tabController.indexIsChanging) {
+                      if (index == 0) {
+                        _controller.roomCtr.animateToTop();
+                      } else {
+                        _controller.userCtr.animateToTop();
+                      }
+                    }
+                  },
                 ),
                 Expanded(
                   child: tabBarView(

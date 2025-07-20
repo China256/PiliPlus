@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:PiliPlus/common/widgets/pair.dart';
-import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:webdav_client/webdav_client.dart' as webdav;
@@ -18,11 +18,11 @@ class WebDav {
   factory WebDav() => _instance;
 
   Future<Pair<bool, String?>> init() async {
-    final webDavUri = GStorage.webdavUri;
-    final webDavUsername = GStorage.webdavUsername;
-    final webDavPassword = GStorage.webdavPassword;
-    _webdavDirectory = GStorage.webdavDirectory;
-    if (_webdavDirectory.endsWith('/').not) {
+    final webDavUri = Pref.webdavUri;
+    final webDavUsername = Pref.webdavUsername;
+    final webDavPassword = Pref.webdavPassword;
+    _webdavDirectory = Pref.webdavDirectory;
+    if (!_webdavDirectory.endsWith('/')) {
       _webdavDirectory += '/';
     }
     _webdavDirectory += 'PiliPlus';

@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 class ActionItem extends StatefulWidget {
@@ -48,7 +47,6 @@ class ActionItemState extends State<ActionItem>
 
   late final _isThumbsUp = widget.semanticsLabel == '点赞';
   late int _lastTime;
-  late bool _hideCircle = false;
   Timer? _timer;
 
   void _startLongPress() {
@@ -68,7 +66,7 @@ class ActionItemState extends State<ActionItem>
   void _cancelLongPress([bool isCancel = false]) {
     int duration = DateTime.now().millisecondsSinceEpoch - _lastTime;
     if (duration >= 200 && duration < 1500) {
-      if (widget.hasTriple.not) {
+      if (!widget.hasTriple) {
         controller?.reverse();
         widget.callBack?.call(false);
       }
@@ -101,15 +99,12 @@ class ActionItemState extends State<ActionItem>
   }
 
   void listener() {
-    setState(() {
-      _hideCircle = controller?.value == 1;
-      if (_hideCircle) {
-        controller?.reset();
-        if (_isThumbsUp) {
-          widget.onLongPress?.call();
-        }
+    if (controller!.value == 1) {
+      controller!.reset();
+      if (_isThumbsUp) {
+        widget.onLongPress?.call();
       }
-    });
+    }
   }
 
   void cancelTimer() {
@@ -137,70 +132,76 @@ class ActionItemState extends State<ActionItem>
         label: (widget.text ?? "") +
             (widget.selectStatus ? "已" : "") +
             widget.semanticsLabel,
-        child: InkWell(
-          borderRadius: const BorderRadius.all(Radius.circular(6)),
-          onTap: _isThumbsUp
-              ? null
-              : () {
-                  feedBack();
-                  widget.onTap?.call();
-                },
-          onLongPress: _isThumbsUp ? null : widget.onLongPress,
-          onTapDown: (details) => _isThumbsUp ? _startLongPress() : null,
-          onTapUp: (details) => _isThumbsUp ? _cancelLongPress() : null,
-          onTapCancel: () => _isThumbsUp ? _cancelLongPress(true) : null,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  if (widget.needAnim && !_hideCircle)
-                    CustomPaint(
-                      size: const Size(28, 28),
-                      painter: _ArcPainter(
-                        color: theme.colorScheme.primary,
-                        sweepAngle: _animation!.value,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: const BorderRadius.all(Radius.circular(6)),
+            onTap: _isThumbsUp
+                ? null
+                : () {
+                    feedBack();
+                    widget.onTap?.call();
+                  },
+            onLongPress: _isThumbsUp ? null : widget.onLongPress,
+            onTapDown: _isThumbsUp ? (details) => _startLongPress() : null,
+            onTapUp: _isThumbsUp ? (details) => _cancelLongPress() : null,
+            onTapCancel: _isThumbsUp ? () => _cancelLongPress(true) : null,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    if (widget.needAnim)
+                      AnimatedBuilder(
+                        animation: _animation!,
+                        builder: (context, child) => CustomPaint(
+                          size: const Size(28, 28),
+                          painter: _ArcPainter(
+                            color: theme.colorScheme.primary,
+                            sweepAngle: _animation!.value,
+                          ),
+                        ),
+                      )
+                    else
+                      const SizedBox(width: 28, height: 28),
+                    Icon(
+                      widget.selectStatus
+                          ? widget.selectIcon!.icon!
+                          : widget.icon.icon,
+                      size: 18,
+                      color: widget.selectStatus
+                          ? theme.colorScheme.primary
+                          : widget.icon.color ?? theme.colorScheme.outline,
+                    ),
+                  ],
+                ),
+                if (widget.text != null)
+                  AnimatedOpacity(
+                    opacity: widget.isLoading! ? 0 : 1,
+                    duration: const Duration(milliseconds: 200),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      transitionBuilder:
+                          (Widget child, Animation<double> animation) {
+                        return ScaleTransition(scale: animation, child: child);
+                      },
+                      child: Text(
+                        widget.text!,
+                        key: ValueKey<String>(widget.text!),
+                        style: TextStyle(
+                          color: widget.selectStatus
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outline,
+                          fontSize: theme.textTheme.labelSmall!.fontSize,
+                        ),
+                        semanticsLabel: "",
                       ),
-                    )
-                  else
-                    const SizedBox(width: 28, height: 28),
-                  Icon(
-                    widget.selectStatus
-                        ? widget.selectIcon!.icon!
-                        : widget.icon.icon,
-                    size: 18,
-                    color: widget.selectStatus
-                        ? theme.colorScheme.primary
-                        : widget.icon.color ?? theme.colorScheme.outline,
-                  ),
-                ],
-              ),
-              if (widget.text != null)
-                AnimatedOpacity(
-                  opacity: widget.isLoading! ? 0 : 1,
-                  duration: const Duration(milliseconds: 200),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    transitionBuilder:
-                        (Widget child, Animation<double> animation) {
-                      return ScaleTransition(scale: animation, child: child);
-                    },
-                    child: Text(
-                      widget.text!,
-                      key: ValueKey<String>(widget.text!),
-                      style: TextStyle(
-                        color: widget.selectStatus
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.outline,
-                        fontSize: theme.textTheme.labelSmall!.fontSize,
-                      ),
-                      semanticsLabel: "",
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       );

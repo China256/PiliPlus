@@ -6,22 +6,32 @@ import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/image/image_save.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/keep_alive_wrapper.dart';
+import 'package:PiliPlus/common/widgets/page/tabs.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
 import 'package:PiliPlus/common/widgets/stat/stat.dart';
+import 'package:PiliPlus/http/fav.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/video.dart';
-import 'package:PiliPlus/models/bangumi/info.dart' as bangumi;
 import 'package:PiliPlus/models/common/badge_type.dart';
 import 'package:PiliPlus/models/common/episode_panel_type.dart';
-import 'package:PiliPlus/models/video_detail_res.dart' as video;
+import 'package:PiliPlus/models/common/stat_type.dart';
+import 'package:PiliPlus/models/user/info.dart';
+import 'package:PiliPlus/models_new/pgc/pgc_info_model/episode.dart' as pgc;
+import 'package:PiliPlus/models_new/video/video_detail/episode.dart' as ugc;
+import 'package:PiliPlus/models_new/video/video_detail/page.dart';
+import 'package:PiliPlus/models_new/video/video_relation/data.dart';
 import 'package:PiliPlus/pages/common/common_slide_page.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/page.dart';
+import 'package:PiliPlus/utils/accounts.dart';
+import 'package:PiliPlus/utils/date_util.dart';
+import 'package:PiliPlus/utils/duration_util.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/utils.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/material.dart' hide TabBarView;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -40,7 +50,7 @@ class EpisodePanel extends CommonSlidePage {
     required this.bvid,
     required this.cid,
     required this.cover,
-    this.showTitle,
+    this.showTitle = true,
     required this.list,
     this.seasonId,
     this.initialTabIndex = 0,
@@ -60,7 +70,7 @@ class EpisodePanel extends CommonSlidePage {
   final String bvid;
   final int cid;
   final String? cover;
-  final bool? showTitle;
+  final bool showTitle;
   final List list;
   final int? seasonId;
   final int initialTabIndex;
@@ -88,7 +98,7 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
       : widget.list[_currentTabIndex.value];
 
   // item
-  late RxInt _currentItemIndex;
+  late int _currentItemIndex;
   int get _findCurrentItemIndex => max(
         0,
         _getCurrEpisodes.indexWhere((item) => item.cid == widget.cid),
@@ -109,14 +119,14 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
   @override
   void didUpdateWidget(EpisodePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.showTitle != false) {
+    if (widget.showTitle) {
       return;
     }
 
     void jumpToCurrent() {
       int newItemIndex = _findCurrentItemIndex;
-      if (_currentItemIndex.value != _findCurrentItemIndex) {
-        _currentItemIndex.value = newItemIndex;
+      if (_currentItemIndex != _findCurrentItemIndex) {
+        _currentItemIndex = newItemIndex;
         try {
           _itemScrollController[_currentTabIndex.value].jumpTo(
             index: newItemIndex,
@@ -148,16 +158,17 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
 
     if (widget.type == EpisodeType.season && Accounts.main.isLogin) {
       _favState = LoadingState.loading().obs;
-      VideoHttp.videoRelation(bvid: widget.bvid).then((result) {
-        if (result['status']) {
-          if (result['data']?['season_fav'] is bool) {
-            _favState!.value = Success(result['data']['season_fav']);
+      VideoHttp.videoRelation(bvid: widget.bvid).then(
+        (result) {
+          if (result['status']) {
+            VideoRelation data = result['data'];
+            _favState!.value = Success(data.seasonFav ?? false);
           }
-        }
-      });
+        },
+      );
     }
 
-    _currentItemIndex = _findCurrentItemIndex.obs;
+    _currentItemIndex = _findCurrentItemIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() {
@@ -166,7 +177,7 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           try {
             _itemScrollController[widget.initialTabIndex]
-                .jumpTo(index: _currentItemIndex.value);
+                .jumpTo(index: _currentItemIndex);
           } catch (_) {}
         });
       }
@@ -194,42 +205,63 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
 
   @override
   Widget buildPage(ThemeData theme) {
+    final isMulti = widget.type == EpisodeType.season && widget.list.length > 1;
+
+    Widget tabbar() => TabBar(
+          controller: _tabController,
+          padding: const EdgeInsets.only(right: 60),
+          isScrollable: true,
+          tabs: widget.list.map((item) => Tab(text: item.title)).toList(),
+          dividerHeight: 1,
+          dividerColor: theme.dividerColor.withValues(alpha: 0.1),
+        );
+
+    if (isMulti && enableSlide) {
+      return CustomTabBarView(
+        controller: _tabController,
+        physics: const CustomTabBarViewScrollPhysics(),
+        bgColor: theme.colorScheme.surface,
+        header: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildToolbar(theme),
+            tabbar(),
+          ],
+        ),
+        children: List.generate(
+          widget.list.length,
+          (index) => _buildBody(
+            theme,
+            index,
+            widget.list[index].episodes,
+          ),
+        ),
+      );
+    }
+
     return Material(
-      color: widget.showTitle == false
-          ? Colors.transparent
-          : theme.colorScheme.surface,
+      color: widget.showTitle ? theme.colorScheme.surface : null,
+      type: widget.showTitle ? MaterialType.canvas : MaterialType.transparency,
       child: Column(
         children: [
           _buildToolbar(theme),
-          if (widget.type == EpisodeType.season && widget.list.length > 1) ...[
-            TabBar(
-              controller: _tabController,
-              padding: const EdgeInsets.only(right: 60),
-              isScrollable: true,
-              tabs: widget.list.map((item) => Tab(text: item.title)).toList(),
-              dividerHeight: 1,
-              dividerColor: theme.dividerColor.withValues(alpha: 0.1),
-            ),
+          if (isMulti) ...[
+            tabbar(),
             Expanded(
-              child: Material(
-                color: Colors.transparent,
-                child: tabBarView(
-                  controller: _tabController,
-                  children: List.generate(
-                    widget.list.length,
-                    (index) => _buildBody(
-                      theme,
-                      index,
-                      widget.list[index].episodes,
-                    ),
+              child: tabBarView(
+                controller: _tabController,
+                children: List.generate(
+                  widget.list.length,
+                  (index) => _buildBody(
+                    theme,
+                    index,
+                    widget.list[index].episodes,
                   ),
                 ),
               ),
             ),
           ] else
-            Expanded(
-              child: enableSlide ? slideList(theme) : buildList(theme),
-            ),
+            Expanded(child: enableSlide ? slideList(theme) : buildList(theme)),
         ],
       ),
     );
@@ -237,50 +269,45 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
 
   @override
   Widget buildList(ThemeData theme) {
-    return Material(
-      color: Colors.transparent,
-      child: _buildBody(theme, 0, _getCurrEpisodes),
-    );
+    return _buildBody(theme, 0, _getCurrEpisodes);
   }
 
-  Widget _buildBody(ThemeData theme, int index, episodes) {
+  Widget _buildBody(ThemeData theme, int tabIndex, episodes) {
     return KeepAliveWrapper(
       builder: (context) => ScrollablePositionedList.separated(
         padding: EdgeInsets.only(
           top: 7,
-          bottom: MediaQuery.of(context).padding.bottom + 80,
+          bottom: MediaQuery.paddingOf(context).bottom + 80,
         ),
-        reverse: _isReversed[index],
+        reverse: _isReversed[tabIndex],
         itemCount: episodes.length,
         physics: const AlwaysScrollableScrollPhysics(),
-        itemBuilder: (BuildContext context, int index) {
-          final episode = episodes[index];
+        itemBuilder: (BuildContext context, int itemIndex) {
+          final episode = episodes[itemIndex];
+          Widget episodeItem = _buildEpisodeItem(
+            theme: theme,
+            episode: episode,
+            index: itemIndex,
+            length: episodes.length,
+            isCurrentIndex: tabIndex == widget.initialTabIndex
+                ? itemIndex == _currentItemIndex
+                : false,
+          );
           return widget.type == EpisodeType.season &&
-                  widget.showTitle != false &&
+                  widget.showTitle &&
                   episode.pages.length > 1
               ? Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Obx(
-                      () => _buildEpisodeItem(
-                        theme: theme,
-                        episode: episode,
-                        index: index,
-                        length: episodes.length,
-                        isCurrentIndex:
-                            _currentTabIndex.value == widget.initialTabIndex
-                                ? _currentItemIndex.value == index
-                                : false,
-                      ),
-                    ),
+                    episodeItem,
                     Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 5),
                       child: PagesPanel(
                         list:
                             widget.initialTabIndex == _currentTabIndex.value &&
-                                    index == _currentItemIndex.value
+                                    itemIndex == _currentItemIndex
                                 ? null
                                 : episode.pages,
                         cover: episode.arc?.pic,
@@ -291,20 +318,9 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
                     ),
                   ],
                 )
-              : Obx(
-                  () => _buildEpisodeItem(
-                    theme: theme,
-                    episode: episode,
-                    index: index,
-                    length: episodes.length,
-                    isCurrentIndex:
-                        _currentTabIndex.value == widget.initialTabIndex
-                            ? _currentItemIndex.value == index
-                            : false,
-                  ),
-                );
+              : episodeItem;
         },
-        itemScrollController: _itemScrollController[index],
+        itemScrollController: _itemScrollController[tabIndex],
         separatorBuilder: (context, index) => const SizedBox(height: 2),
       ),
     );
@@ -319,54 +335,58 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
   }) {
     late String title;
     String? cover;
+    String? bvid;
     num? duration;
     int? pubdate;
     int? view;
     int? danmaku;
+    bool? isCharging;
 
     switch (episode) {
-      case video.Part():
-        cover = episode.firstFrame ?? widget.cover;
-        title = episode.pagePart!;
-        duration = episode.duration;
-        pubdate = episode.ctime;
+      case Part part:
+        cover = part.firstFrame ?? widget.cover;
+        title = part.pagePart!;
+        duration = part.duration;
+        pubdate = part.ctime;
         break;
-      case video.EpisodeItem():
-        title = episode.title!;
-        cover = episode.arc?.pic;
-        duration = episode.arc?.duration;
-        pubdate = episode.arc?.pubdate;
-        view = episode.arc?.stat?.view;
-        danmaku = episode.arc?.stat?.danmaku;
+      case ugc.EpisodeItem item:
+        title = item.title!;
+        cover = item.arc?.pic;
+        bvid = item.bvid;
+        duration = item.arc?.duration;
+        pubdate = item.arc?.pubdate;
+        view = item.arc?.stat?.view;
+        danmaku = item.arc?.stat?.danmaku;
+        if (item.attribute == 8) {
+          isCharging = true;
+        }
         break;
-      case bangumi.EpisodeItem():
-        if (episode.longTitle != null && episode.longTitle != "") {
-          dynamic leading = episode.title ?? index + 1;
+      case pgc.EpisodeItem item:
+        bvid = item.bvid;
+        if (item.longTitle != null && item.longTitle != "") {
+          dynamic leading = item.title ?? index + 1;
           title =
               "${Utils.isStringNumeric(leading) ? '第$leading话' : leading}  ${episode.longTitle!}";
         } else {
-          title = episode.title!;
+          title = item.title!;
         }
 
-        cover = episode.cover;
-        duration = episode.duration == null ? null : episode.duration! ~/ 1000;
-        pubdate = episode.pubTime;
+        cover = item.cover;
+        duration = item.duration == null ? null : item.duration! ~/ 1000;
+        pubdate = item.pubTime;
         break;
     }
     late final Color primary = theme.colorScheme.primary;
 
-    return Material(
-      color: Colors.transparent,
-      child: SizedBox(
-        height: 98,
+    return SizedBox(
+      height: 98,
+      child: Material(
+        type: MaterialType.transparency,
         child: InkWell(
           onTap: () {
             if (episode.badge != null && episode.badge == "会员") {
-              dynamic userInfo = GStorage.userInfo.get('userInfoCache');
-              int vipStatus = 0;
-              if (userInfo != null) {
-                vipStatus = userInfo.vipStatus;
-              }
+              UserInfoData? userInfo = GStorage.userInfo.get('userInfoCache');
+              int vipStatus = userInfo?.vipStatus ?? 0;
               if (vipStatus != 1) {
                 SmartDialog.showToast('需要大会员');
                 // return;
@@ -374,11 +394,11 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
             }
             SmartDialog.showToast('切换到：$title');
             widget.onClose?.call();
-            if (widget.showTitle == false) {
-              _currentItemIndex.value = index;
+            if (!widget.showTitle) {
+              _currentItemIndex = index;
             }
             widget.changeFucCall(
-              episode is bangumi.EpisodeItem ? episode.epId : null,
+              episode is pgc.EpisodeItem ? episode.epId : null,
               episode.runtimeType.toString() == "EpisodeItem"
                   ? episode.bvid
                   : widget.bvid,
@@ -398,7 +418,7 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
           },
           onLongPress: () {
             if (cover?.isNotEmpty == true) {
-              imageSaveDialog(title: title, cover: cover);
+              imageSaveDialog(title: title, cover: cover, bvid: bvid);
             }
           },
           child: Padding(
@@ -407,7 +427,6 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
               vertical: 5,
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
               spacing: 10,
               children: [
                 if (cover?.isNotEmpty == true)
@@ -425,12 +444,19 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
                             ),
                             if (duration != null && duration > 0)
                               PBadge(
-                                text: Utils.timeFormat(duration),
+                                text: DurationUtil.formatDuration(duration),
                                 right: 6.0,
                                 bottom: 6.0,
                                 type: PBadgeType.gray,
                               ),
-                            if (episode.badge != null)
+                            if (isCharging == true)
+                              const PBadge(
+                                text: '充电专属',
+                                top: 6,
+                                right: 6,
+                                type: PBadgeType.error,
+                              )
+                            else if (episode.badge != null)
                               PBadge(
                                 text: episode.badge,
                                 top: 6,
@@ -475,7 +501,7 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
                       ),
                       if (pubdate != null)
                         Text(
-                          Utils.dateFormat(pubdate),
+                          DateUtil.format(pubdate),
                           maxLines: 1,
                           style: TextStyle(
                             fontSize: 12,
@@ -487,20 +513,17 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
                       if (view != null) ...[
                         const SizedBox(height: 2),
                         Row(
+                          spacing: 8,
                           children: [
-                            StatView(
-                              context: context,
-                              theme: 'gray',
+                            StatWidget(
                               value: view,
+                              type: StatType.play,
                             ),
-                            if (danmaku != null) ...[
-                              const SizedBox(width: 8),
-                              StatDanMu(
-                                context: context,
-                                theme: 'gray',
+                            if (danmaku != null)
+                              StatWidget(
                                 value: danmaku,
+                                type: StatType.danmaku,
                               ),
-                            ],
                           ],
                         ),
                       ],
@@ -523,7 +546,7 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
               ? Icons.notifications_off_outlined
               : Icons.notifications_active_outlined,
           onPressed: () async {
-            dynamic result = await VideoHttp.seasonFav(
+            var result = await FavHttp.seasonFav(
               isFav: response,
               seasonId: widget.seasonId,
             );
@@ -549,8 +572,7 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
 
   Widget _buildToolbar(ThemeData theme) => Container(
         height: 45,
-        padding: EdgeInsets.symmetric(
-            horizontal: widget.showTitle != false ? 14 : 6),
+        padding: EdgeInsets.symmetric(horizontal: widget.showTitle ? 14 : 6),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
@@ -560,7 +582,7 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
         ),
         child: Row(
           children: [
-            if (widget.showTitle != false)
+            if (widget.showTitle)
               Text(
                 widget.type.title,
                 style: theme.textTheme.titleMedium,
@@ -578,7 +600,7 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
                     duration: const Duration(milliseconds: 200),
                   );
                 } catch (e) {
-                  debugPrint('to top: $e');
+                  if (kDebugMode) debugPrint('to top: $e');
                 }
               },
             ),
@@ -594,7 +616,7 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
                     duration: const Duration(milliseconds: 200),
                   );
                 } catch (e) {
-                  debugPrint('to bottom: $e');
+                  if (kDebugMode) debugPrint('to bottom: $e');
                 }
               },
             ),
@@ -608,7 +630,7 @@ class _EpisodePanelState extends CommonSlidePageState<EpisodePanel> {
                     await Future.delayed(const Duration(milliseconds: 225));
                   }
                   _itemScrollController[_currentTabIndex.value].scrollTo(
-                    index: _currentItemIndex.value,
+                    index: _currentItemIndex,
                     duration: const Duration(milliseconds: 200),
                   );
                 } catch (_) {}

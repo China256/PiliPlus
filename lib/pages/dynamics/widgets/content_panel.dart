@@ -1,6 +1,7 @@
 // 内容
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/common/widgets/image/image_view.dart';
+import 'package:PiliPlus/common/widgets/text/text.dart' as custom_text;
 import 'package:PiliPlus/models/dynamics/result.dart';
 import 'package:PiliPlus/pages/dynamics/widgets/rich_node_panel.dart';
 import 'package:flutter/material.dart';
@@ -11,31 +12,10 @@ Widget content(
   bool isSave,
   BuildContext context,
   DynamicItemModel item,
-  String? source,
+  bool isDetail,
   Function(List<String>, int)? callback, {
   floor = 1,
 }) {
-  InlineSpan picsNodes() {
-    return WidgetSpan(
-      child: LayoutBuilder(
-        builder: (context, constraints) => imageView(
-          constraints.maxWidth,
-          (item.modules.moduleDynamic!.major!.opus!.pics as List)
-              .map(
-                (item) => ImageModel(
-                  width: item.width,
-                  height: item.height,
-                  url: item.url ?? '',
-                  liveUrl: item.liveUrl,
-                ),
-              )
-              .toList(),
-          callback: callback,
-        ),
-      ),
-    );
-  }
-
   TextSpan? richNodes = richNode(theme, item, context);
 
   return Padding(
@@ -72,27 +52,49 @@ Widget content(
                 ],
               ),
               style: TextStyle(
-                fontSize: source == 'detail' && !isSave ? 16 : 15,
+                fontSize: floor != 1
+                    ? 14
+                    : isDetail && !isSave
+                        ? 16
+                        : 15,
                 color: theme.colorScheme.primary,
               ),
             ),
           ),
         if (richNodes != null)
-          source == 'detail'
+          isDetail && floor == 1
               ? SelectableText.rich(
                   richNodes,
                   style: isSave
                       ? const TextStyle(fontSize: 15)
                       : const TextStyle(fontSize: 16),
                 )
-              : Text.rich(
-                  style: const TextStyle(fontSize: 15),
+              : custom_text.Text.rich(
+                  style: floor == 1
+                      ? const TextStyle(fontSize: 15)
+                      : const TextStyle(fontSize: 14),
                   richNodes,
-                  maxLines: 6,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: isSave ? null : 6,
                 ),
         if (item.modules.moduleDynamic?.major?.opus?.pics?.isNotEmpty == true)
-          Text.rich(picsNodes()),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return imageView(
+                constraints.maxWidth,
+                item.modules.moduleDynamic!.major!.opus!.pics!
+                    .map(
+                      (item) => ImageModel(
+                        width: item.width,
+                        height: item.height,
+                        url: item.url ?? '',
+                        liveUrl: item.liveUrl,
+                      ),
+                    )
+                    .toList(),
+                callback: callback,
+              );
+            },
+          ),
       ],
     ),
   );

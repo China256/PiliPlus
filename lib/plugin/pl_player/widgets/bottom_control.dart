@@ -4,13 +4,12 @@ import 'package:PiliPlus/common/widgets/progress_bar/audio_video_progress_bar.da
 import 'package:PiliPlus/common/widgets/progress_bar/segment_progress_bar.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/view.dart';
-import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:get/get.dart';
 
-class BottomControl extends StatelessWidget implements PreferredSizeWidget {
+class BottomControl extends StatelessWidget {
   final PlPlayerController controller;
   final Function buildBottomControl;
   const BottomControl({
@@ -18,9 +17,6 @@ class BottomControl extends StatelessWidget implements PreferredSizeWidget {
     required this.buildBottomControl,
     super.key,
   });
-
-  @override
-  Size get preferredSize => const Size(double.infinity, kToolbarHeight);
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +71,7 @@ class BottomControl extends StatelessWidget implements PreferredSizeWidget {
                           double newProgress =
                               duration.timeStamp.inSeconds / max;
                           if (controller.showSeekPreview) {
-                            if (controller.showPreview.value.not) {
+                            if (!controller.showPreview.value) {
                               controller.showPreview.value = true;
                             }
                             controller.previewDx.value =

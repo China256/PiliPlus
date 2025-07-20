@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/text_field/controller.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show MainListReply, ReplyInfo, SubjectControl, Mode;
 import 'package:PiliPlus/grpc/bilibili/pagination.pb.dart';
@@ -6,10 +7,11 @@ import 'package:PiliPlus/http/reply.dart';
 import 'package:PiliPlus/models/common/reply/reply_sort_type.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
 import 'package:PiliPlus/pages/video/reply_new/view.dart';
+import 'package:PiliPlus/services/account_service.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/reply_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
-import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
@@ -20,26 +22,25 @@ import 'package:get/get_navigation/src/dialog/dialog_route.dart';
 abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
   RxInt count = (-1).obs;
 
-  Rx<ReplySortType> sortType = ReplySortType.time.obs;
+  late Rx<ReplySortType> sortType;
+  late Rx<Mode> mode;
 
-  late final savedReplies = {};
+  late final savedReplies = <Object, List<RichTextItem>?>{};
 
-  late final bool isLogin = Accounts.main.isLogin;
+  AccountService accountService = Get.find<AccountService>();
 
   Int64? upMid;
   Int64? cursorNext;
+  SubjectControl? subjectControl;
   FeedPaginationReply? paginationReply;
-  late Rx<Mode> mode = Mode.MAIN_LIST_HOT.obs;
   late bool hasUpTop = false;
 
   @override
   bool? get hasFooter => true;
 
-  late final antiGoodsReply = GStorage.antiGoodsReply;
-
   // comment antifraud
-  late final _enableCommAntifraud = GStorage.enableCommAntifraud;
-  late final _biliSendCommAntifraud = GStorage.biliSendCommAntifraud;
+  late final _enableCommAntifraud = Pref.enableCommAntifraud;
+  late final _biliSendCommAntifraud = Pref.biliSendCommAntifraud;
   bool get enableCommAntifraud =>
       _enableCommAntifraud || _biliSendCommAntifraud;
   dynamic get sourceId;
@@ -47,16 +48,9 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
   @override
   void onInit() {
     super.onInit();
-    int defaultReplySortIndex = GStorage.setting
-        .get(SettingBoxKey.replySortType, defaultValue: 1) as int;
-    if (defaultReplySortIndex == 2) {
-      GStorage.setting.put(SettingBoxKey.replySortType, 0);
-      defaultReplySortIndex = 0;
-    }
-    sortType.value = ReplySortType.values[defaultReplySortIndex];
-    if (sortType.value == ReplySortType.time) {
-      mode.value = Mode.MAIN_LIST_TIME;
-    }
+    int replySortType = Pref.replySortType;
+    sortType = ReplySortType.values[replySortType].obs;
+    mode = (replySortType == 0 ? Mode.MAIN_LIST_TIME : Mode.MAIN_LIST_HOT).obs;
   }
 
   @override
@@ -73,6 +67,7 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
     paginationReply = data.paginationReply;
     count.value = data.subjectControl.count.toInt();
     if (isRefresh) {
+      subjectControl = data.subjectControl;
       upMid ??= data.subjectControl.upMid;
       hasUpTop = data.hasUpTop();
       if (data.hasUpTop()) {
@@ -87,6 +82,7 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
   Future<void> onRefresh() {
     cursorNext = null;
     paginationReply = null;
+    subjectControl = null;
     return super.onRefresh();
   }
 
@@ -96,10 +92,10 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
       feedBack();
       switch (sortType.value) {
         case ReplySortType.time:
-          sortType.value = ReplySortType.like;
+          sortType.value = ReplySortType.hot;
           mode.value = Mode.MAIN_LIST_HOT;
           break;
-        case ReplySortType.like:
+        case ReplySortType.hot:
           sortType.value = ReplySortType.time;
           mode.value = Mode.MAIN_LIST_TIME;
           break;
@@ -112,19 +108,20 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
     BuildContext context, {
     int? oid,
     ReplyInfo? replyItem,
-    int index = 0,
     int? replyType,
   }) {
     assert(replyItem != null || (oid != null && replyType != null));
     String? hint;
     try {
-      if (loadingState.value is Success) {
-        SubjectControl subjectControl =
-            (loadingState.value as Success).response.subjectControl;
-        if (subjectControl.hasSwitcherType() &&
-            subjectControl.switcherType != 1 &&
-            subjectControl.hasRootText()) {
-          hint = subjectControl.rootText;
+      if (subjectControl != null && subjectControl!.hasRootText()) {
+        if (subjectControl!.inputDisable) {
+          SmartDialog.showToast(subjectControl!.rootText);
+          return;
+        }
+        if ((subjectControl!.hasSwitcherType() &&
+                subjectControl!.switcherType != 1) ||
+            subjectControl!.rootText.contains('可发评论')) {
+          hint = subjectControl!.rootText;
         }
       }
     } catch (_) {}
@@ -139,9 +136,13 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
             parent: oid != null ? 0 : replyItem!.id.toInt(),
             replyType: replyItem?.type.toInt() ?? replyType!,
             replyItem: replyItem,
-            initialValue: savedReplies[key],
+            items: savedReplies[key],
             onSave: (reply) {
-              savedReplies[key] = reply;
+              if (reply.isEmpty) {
+                savedReplies.remove(key);
+              } else {
+                savedReplies[key] = reply.toList();
+              }
             },
             hint: hint,
           );
@@ -160,22 +161,25 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
             child: child,
           );
         },
+        settings: RouteSettings(arguments: Get.arguments),
       ),
     )
         .then(
       (res) {
         if (res != null) {
-          savedReplies[key] = null;
+          savedReplies.remove(key);
           ReplyInfo replyInfo = RequestUtils.replyCast(res);
-          if (loadingState.value is Success) {
-            List<ReplyInfo>? list = (loadingState.value as Success).response;
+          if (loadingState.value.isSuccess) {
+            List<ReplyInfo>? list = loadingState.value.data;
             if (list == null) {
               loadingState.value = Success([replyInfo]);
             } else {
               if (oid != null) {
                 list.insert(hasUpTop ? 1 : 0, replyInfo);
               } else {
-                list[index].replies.add(replyInfo);
+                replyItem!
+                  ..count += 1
+                  ..replies.add(replyInfo);
               }
               loadingState.refresh();
             }
@@ -185,51 +189,52 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
           count.value += 1;
 
           // check reply
-          if (enableCommAntifraud && context.mounted) {
-            ReplyUtils.onCheckReply(
-              context: context,
-              replyInfo: replyInfo,
-              biliSendCommAntifraud: _biliSendCommAntifraud,
-              sourceId: sourceId,
-              isManual: false,
-            );
+          if (enableCommAntifraud) {
+            onCheckReply(replyInfo, isManual: false);
           }
         }
       },
     );
   }
 
-  void onRemove(int index, int? subIndex) {
-    List<ReplyInfo> list = (loadingState.value as Success).response;
+  void onRemove(int index, ReplyInfo item, int? subIndex) {
+    List<ReplyInfo> list = loadingState.value.data!;
     if (subIndex == null) {
       list.removeAt(index);
     } else {
-      list[index].replies.removeAt(subIndex);
+      item
+        ..count -= 1
+        ..replies.removeAt(subIndex);
     }
     count.value -= 1;
     loadingState.refresh();
   }
 
-  void onCheckReply(BuildContext context, ReplyInfo replyInfo) {
+  void onCheckReply(ReplyInfo replyInfo, {required bool isManual}) {
     ReplyUtils.onCheckReply(
-      context: context,
       replyInfo: replyInfo,
       biliSendCommAntifraud: _biliSendCommAntifraud,
       sourceId: sourceId,
-      isManual: true,
+      isManual: isManual,
     );
   }
 
-  Future<void> onToggleTop(index, oid, int type, bool isUpTop, int rpid) async {
+  Future<void> onToggleTop(
+    ReplyInfo item,
+    int index,
+    oid,
+    int type,
+  ) async {
+    bool isUpTop = item.replyControl.isUpTop;
     final res = await ReplyHttp.replyTop(
       oid: oid,
       type: type,
-      rpid: rpid,
+      rpid: item.id,
       isUpTop: isUpTop,
     );
     if (res['status']) {
-      List<ReplyInfo> list = (loadingState.value as Success).response;
-      list[index].replyControl.isUpTop = !isUpTop;
+      List<ReplyInfo> list = loadingState.value.data!;
+      item.replyControl.isUpTop = !isUpTop;
       if (!isUpTop && index != 0) {
         list[0].replyControl.isUpTop = false;
         final item = list.removeAt(index);
@@ -240,5 +245,11 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
     } else {
       SmartDialog.showToast(res['msg']);
     }
+  }
+
+  @override
+  void onClose() {
+    savedReplies.clear();
+    super.onClose();
   }
 }

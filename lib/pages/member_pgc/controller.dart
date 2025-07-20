@@ -1,9 +1,9 @@
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/member.dart';
 import 'package:PiliPlus/models/common/member/contribute_type.dart';
-import 'package:PiliPlus/models/space/data.dart';
-import 'package:PiliPlus/models/space_archive/data.dart';
-import 'package:PiliPlus/models/space_archive/item.dart';
+import 'package:PiliPlus/models_new/space/space/data.dart';
+import 'package:PiliPlus/models_new/space/space_archive/data.dart';
+import 'package:PiliPlus/models_new/space/space_archive/item.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
 import 'package:PiliPlus/pages/member/controller.dart';
 import 'package:get/get.dart';
@@ -23,13 +23,13 @@ class MemberBangumiCtr
   @override
   void onInit() {
     super.onInit();
-    dynamic response = (_ctr.loadingState.value as Success).response;
-    if (response is SpaceData) {
+    SpaceData? response = _ctr.loadingState.value.data;
+    if (response != null) {
       page = 2;
-      dynamic res = response.season;
+      var res = response.season!;
       loadingState.value = Success(res.item);
-      count = res.count;
-      isEnd = res.item!.length >= count;
+      count = res.count!;
+      isEnd = res.item!.length >= count!;
     } else {
       queryData();
     }
